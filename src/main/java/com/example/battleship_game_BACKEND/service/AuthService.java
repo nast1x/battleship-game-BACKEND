@@ -52,4 +52,20 @@ public class AuthService {
 
         return new JwtResponse(jwt, "Bearer", savedPlayer.getPlayerId(), savedPlayer.getUsername());
     }
+
+    public void changePassword(Player player, String oldPassword, String newPassword) {
+        // Проверяем старый пароль
+        if (!passwordEncoder.matches(oldPassword, player.getPassword())) {
+            throw new RuntimeException("Неверный старый пароль");
+        }
+
+        // Проверяем, что новый пароль отличается от старого
+        if (passwordEncoder.matches(newPassword, player.getPassword())) {
+            throw new RuntimeException("Новый пароль должен отличаться от старого");
+        }
+
+        // Устанавливаем новый пароль
+        player.setPassword(passwordEncoder.encode(newPassword));
+        playerRepository.save(player);
+    }
 }

@@ -58,4 +58,8 @@ public class PlayerService {
         }
         return false;
     }
+
+    public Player save(Player player) {
+        return playerRepository.save(player);
+    }
 }

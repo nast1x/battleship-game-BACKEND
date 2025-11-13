@@ -49,6 +49,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/api/players/avatars").permitAll() // Разрешаем доступ к списку аватаров
                                 .requestMatchers("/api/players/current").authenticated() // Разрешаем аутентифицированным пользователям
+                                .requestMatchers("/api/auth/change-password").authenticated() // Для пароля
                                 .anyRequest().authenticated()
                 );
 
