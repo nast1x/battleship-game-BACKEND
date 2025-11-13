@@ -23,7 +23,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final CorsConfigurationSource corsConfigurationSource; // Добавляем CorsConfigurationSource
+    private final CorsConfigurationSource corsConfigurationSource; // Внедряем бин
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -38,7 +38,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource)) // Включаем CORS с конфигурацией
+                .cors(cors -> cors.configurationSource(corsConfigurationSource)) // ← Используем ваш CORS
                 .csrf(csrf -> csrf.disable())
                 .exceptionHandling(exceptionHandling ->
                         exceptionHandling.authenticationEntryPoint(jwtAuthenticationEntryPoint))
@@ -47,9 +47,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
                                 .requestMatchers("/api/auth/**").permitAll()
-                                .requestMatchers("/api/players/avatars").permitAll() // Разрешаем доступ к списку аватаров
-                                .requestMatchers("/api/players/current").authenticated() // Разрешаем аутентифицированным пользователям
-                                .requestMatchers("/api/auth/change-password").authenticated() // Для пароля
+                                .requestMatchers("/api/players/avatars").permitAll()
+                                .requestMatchers("/api/players/current").authenticated()
+                                .requestMatchers("/api/auth/change-password").authenticated()
                                 .anyRequest().authenticated()
                 );
 
