@@ -28,7 +28,7 @@ public class SecurityConfig {
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final CorsConfigurationSource corsConfigurationSource; // Добавляем CorsConfigurationSource
+    private final CorsConfigurationSource corsConfigurationSource; // Внедряем бин
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -53,9 +53,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
                                 .requestMatchers("/api/auth/**").permitAll()
-                                .requestMatchers("/api/players/avatars").permitAll() // Разрешаем доступ к списку аватаров
-                                .requestMatchers("/api/players/current").authenticated() // Разрешаем аутентифицированным пользователям
-                                .requestMatchers("/api/auth/change-password").authenticated() // Для пароля
+                                .requestMatchers("/api/players/avatars").permitAll()
+                                .requestMatchers("/api/players/current").authenticated()
+                                .requestMatchers("/api/auth/change-password").authenticated()
                                 .anyRequest().authenticated()
                 );
 
