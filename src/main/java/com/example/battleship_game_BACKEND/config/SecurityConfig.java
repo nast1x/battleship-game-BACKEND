@@ -2,6 +2,7 @@ package com.example.battleship_game_BACKEND.config;
 
 import com.example.battleship_game_BACKEND.security.JwtAuthenticationEntryPoint;
 import com.example.battleship_game_BACKEND.security.JwtAuthenticationFilter;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -13,6 +14,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -21,16 +23,12 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    public SecurityConfig(JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint,
-                          JwtAuthenticationFilter jwtAuthenticationFilter) {
-        this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-    }
+    private final CorsConfigurationSource corsConfigurationSource; // Добавляем CorsConfigurationSource
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -45,6 +43,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource)) // Включаем CORS с конфигурацией
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ← Используем CORS
                 .csrf(csrf -> csrf.disable())
                 .exceptionHandling(exceptionHandling ->
@@ -54,6 +53,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorizeRequests ->
                         authorizeRequests
                                 .requestMatchers("/api/auth/**").permitAll()
+                                .requestMatchers("/api/players/avatars").permitAll() // Разрешаем доступ к списку аватаров
+                                .requestMatchers("/api/players/current").authenticated() // Разрешаем аутентифицированным пользователям
+                                .requestMatchers("/api/auth/change-password").authenticated() // Для пароля
                                 .anyRequest().authenticated()
                 );
 
