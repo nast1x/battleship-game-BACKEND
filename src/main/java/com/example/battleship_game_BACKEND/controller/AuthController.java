@@ -13,7 +13,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -22,60 +21,72 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
+
     @PostMapping("/signin")
     public ResponseEntity<JwtResponse> authenticateUser(@RequestBody LoginRequest loginRequest) {
+        System.out.println("Получен запрос на вход: " + loginRequest.getNickname());
         try {
             JwtResponse jwtResponse = authService.authenticateUser(loginRequest);
+            System.out.println("Успешный вход для: " + loginRequest.getNickname());
             return ResponseEntity.ok(jwtResponse);
         } catch (Exception e) {
-            return ResponseEntity.status(401).build(); // Unauthorized
+            System.out.println("Ошибка входа: " + e.getMessage());
+            return ResponseEntity.status(401).build();
         }
     }
 
     @PostMapping("/signup")
     public ResponseEntity<JwtResponse> registerUser(@RequestBody SignupRequest signUpRequest) {
+        System.out.println("Получен запрос на регистрацию: " + signUpRequest.getNickname());
         try {
             JwtResponse jwtResponse = authService.registerUser(signUpRequest);
+            System.out.println("Успешная регистрация для: " + signUpRequest.getNickname());
             return ResponseEntity.ok(jwtResponse);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build(); // Nickname already taken
+            System.out.println("Ошибка регистрации: " + e.getMessage());
+            return ResponseEntity.badRequest().build();
         }
     }
 
-    // Пример защищенного эндпоинта - требует валидный JWT в заголовке Authorization
     @GetMapping("/me")
     public ResponseEntity<Player> getCurrentUser() {
-        // Здесь можно получить текущего пользователя из SecurityContext или из токена
-        // Пока возвращаем примерный ответ
-        return ResponseEntity.ok().build(); // Реализация зависит от вашей логики
+        return ResponseEntity.ok().build();
     }
 
-    // AuthController.java - измените метод changePassword
+    // ДОБАВЬТЕ ЭТОТ МЕТОД ДЛЯ СМЕНЫ ПАРОЛЯ
     @PostMapping("/change-password")
-    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest request,
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest changePasswordRequest,
                                             @AuthenticationPrincipal Player player) {
         try {
-            System.out.println("Changing password for player: " + player.getNickname());
+            System.out.println("Получен запрос на смену пароля для пользователя: " +
+                    (player != null ? player.getNickname() : "null"));
+            System.out.println("Старый пароль: " + changePasswordRequest.getOldPassword());
+            System.out.println("Новый пароль: " + changePasswordRequest.getNewPassword());
 
-            authService.changePassword(player, request.getOldPassword(), request.getNewPassword());
+            if (player == null) {
+                System.out.println("Ошибка: пользователь не аутентифицирован");
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("message", "Пользователь не аутентифицирован");
+                return ResponseEntity.status(401).body(errorResponse);
+            }
 
-            System.out.println("Password changed successfully for player: " + player.getNickname());
+            authService.changePassword(player, changePasswordRequest.getOldPassword(), changePasswordRequest.getNewPassword());
 
-            // Возвращаем JSON объект вместо plain text
+            System.out.println("Пароль успешно изменен для пользователя: " + player.getNickname());
+
             Map<String, String> response = new HashMap<>();
             response.put("message", "Пароль успешно изменен");
             return ResponseEntity.ok(response);
 
         } catch (RuntimeException e) {
-            System.out.println("Error changing password: " + e.getMessage());
+            System.out.println("Ошибка при смене пароля: " + e.getMessage());
 
-            // Возвращаем JSON объект с ошибкой
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", e.getMessage());
             return ResponseEntity.badRequest().body(errorResponse);
 
         } catch (Exception e) {
-            System.out.println("Error changing password: " + e.getMessage());
+            System.out.println("Неожиданная ошибка при смене пароля: " + e.getMessage());
 
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("message", "Ошибка при смене пароля: " + e.getMessage());
