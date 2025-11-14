@@ -46,6 +46,7 @@ public class AuthService {
         Player player = new Player();
         player.setNickname(signUpRequest.getNickname());
         player.setPassword(passwordEncoder.encode(signUpRequest.getPassword())); // Хешируем пароль
+        player.setAvatarUrl("avatar1.jpg");
 
         Player savedPlayer = playerRepository.save(player);
         String jwt = jwtTokenUtil.generateToken(savedPlayer);
