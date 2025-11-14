@@ -55,6 +55,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/api/players/avatars").permitAll()
                                 .requestMatchers("/api/players/current").authenticated()
+                                .requestMatchers("/api/players/all").permitAll() // нужно для /api/players/all
                                 .requestMatchers("/api/auth/change-password").authenticated()
                                 .anyRequest().authenticated()
                 );
