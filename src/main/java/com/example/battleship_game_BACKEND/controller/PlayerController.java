@@ -8,6 +8,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/players")
@@ -54,6 +56,20 @@ public class PlayerController {
         } catch (RuntimeException e) {
             System.out.println("Error getting current player: " + e.getMessage());
             return ResponseEntity.badRequest().body("Error getting player data: " + e.getMessage());
+        }
+    }
+
+    // нужен для получения всех игроков
+    @GetMapping("/all")
+    public ResponseEntity<List<Player>> getAllPlayers() {
+        try {
+            System.out.println("Fetching all players");
+            List<Player> players = playerService.getAllPlayers();
+            System.out.println("Returning " + players.size() + " players");
+            return ResponseEntity.ok(players);
+        } catch (Exception e) {
+            System.out.println("Error fetching players: " + e.getMessage());
+            return ResponseEntity.status(500).body(Collections.emptyList());
         }
     }
 }
