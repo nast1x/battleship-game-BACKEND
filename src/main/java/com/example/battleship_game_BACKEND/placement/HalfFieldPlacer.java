@@ -1,204 +1,370 @@
 package com.example.battleship_game_BACKEND.placement;
 
 import com.example.battleship_game_BACKEND.model.ShipPlacement;
+import com.example.battleship_game_BACKEND.repository.PlacementStrategyRepository;
 import lombok.Getter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 
+@Component
 public class HalfFieldPlacer extends BasePlacementStrategy {
 
-    private final boolean useLeft;
-    private final List<Integer> primaryCols;
+    @Getter
+    private final boolean useLeftHalf;
+    private final List<Integer> primaryColumns;
 
-    public HalfFieldPlacer() {
-        super();
-        this.useLeft = new Random().nextBoolean();
-        this.primaryCols = createPrimaryCols();
+    // ===============================================================================
+    // Конструкторы (СИНХРОНИЗИРОВАНЫ)
+    // ===============================================================================
+
+    /**
+     * Конструктор для Spring
+     */
+    @Autowired
+    public HalfFieldPlacer(PlacementStrategyRepository placementStrategyRepository) {
+        super(placementStrategyRepository);
+        this.useLeftHalf = rand.nextBoolean();
+        this.primaryColumns = createPrimaryColumns();
     }
 
-    public HalfFieldPlacer(Random rand) {
-        super(rand);
-        this.useLeft = rand.nextBoolean();
-        this.primaryCols = createPrimaryCols();
+    /**
+     * Конструктор для тестирования с контролируемым Random
+     */
+    public HalfFieldPlacer(PlacementStrategyRepository placementStrategyRepository, Random rand) {
+        super(placementStrategyRepository, rand);
+        this.useLeftHalf = rand.nextBoolean();
+        this.primaryColumns = createPrimaryColumns();
     }
 
-    private List<Integer> createPrimaryCols() {
-        List<Integer> cols = new ArrayList<>();
-        int start = useLeft ? 0 : 5;
-        int end = useLeft ? 4 : 9;
-
-        for (int c = start; c <= end; c++) {
-            cols.add(c);
-        }
-        return cols;
+    /**
+     * Конструктор для конкретной половины (для тестирования)
+     */
+    public HalfFieldPlacer(PlacementStrategyRepository placementStrategyRepository, boolean useLeftHalf) {
+        super(placementStrategyRepository);
+        this.useLeftHalf = useLeftHalf;
+        this.primaryColumns = createPrimaryColumns();
     }
+
+    // ===============================================================================
+    // Основная логика размещения (УПРОЩЕНА)
+    // ===============================================================================
 
     @Override
     public List<ShipPlacement> generatePlacement() {
-        // Пытаемся разместить в основной половине
-        Optional<List<ShipPlacement>> primaryResult = attemptPlacementInPrimaryHalf();
-        return primaryResult.orElseGet(this::attemptPlacementInFullField);
-
-        // Если не получилось - используем всё поле
-    }
-
-    private Optional<List<ShipPlacement>> attemptPlacementInPrimaryHalf() {
-        return attemptPlacement(false);
-    }
-
-    private List<ShipPlacement> attemptPlacementInFullField() {
-        return attemptPlacement(true).orElse(Collections.emptyList());
-    }
-
-    private Optional<List<ShipPlacement>> attemptPlacement(boolean useFullField) {
-        final int maxAttempts = 1000;
-
-        for (int attempt = 0; attempt < maxAttempts; attempt++) {
-            PlacementAttempt attemptInstance = new PlacementAttempt(useFullField);
-            if (attemptInstance.execute()) {
-                return Optional.of(attemptInstance.getResult());
-            }
+        // Сначала пытаемся разместить в выбранной половине
+        List<ShipPlacement> primaryResult = attemptHalfFieldPlacement();
+        if (!primaryResult.isEmpty()) {
+            return primaryResult;
         }
 
-        return Optional.empty();
+        // Fallback: размещаем по всему полю
+        return attemptFullFieldPlacement();
     }
 
     @Override
     protected List<Map.Entry<Integer, Integer>> scanCells() {
-        return generateCellList(false);
+        return generatePrimaryHalfCells();
     }
 
+    // ===============================================================================
+    // Логика размещения в половине поля
+    // ===============================================================================
 
+    private List<ShipPlacement> attemptHalfFieldPlacement() {
+        boolean[][] occupied = new boolean[BOARD_SIZE][BOARD_SIZE];
+        List<Map.Entry<Integer, Integer>> shipsQueue = new ArrayList<>(getFleet());
+        List<ShipPlacement> result = new ArrayList<>();
 
-    private List<Map.Entry<Integer, Integer>> generateCellList(boolean includeSecondary) {
+        Collections.shuffle(shipsQueue, rand);
+        List<Map.Entry<Integer, Integer>> cells = generatePrimaryHalfCells();
+
+        return placeShipsWithConstraints(occupied, shipsQueue, result, cells, true) ?
+                result : Collections.emptyList();
+    }
+
+    private List<ShipPlacement> attemptFullFieldPlacement() {
+        // Используем базовую логику, но с нашим порядком клеток
+        boolean[][] occupied = new boolean[BOARD_SIZE][BOARD_SIZE];
+        List<Map.Entry<Integer, Integer>> shipsQueue = new ArrayList<>(getFleet());
+        List<ShipPlacement> result = new ArrayList<>();
+
+        Collections.shuffle(shipsQueue, rand);
+        List<Map.Entry<Integer, Integer>> cells = generateAllCellsPrioritized();
+
+        return placeShipsWithConstraints(occupied, shipsQueue, result, cells, false) ?
+                result : Collections.emptyList();
+    }
+
+    private boolean placeShipsWithConstraints(
+            boolean[][] occupied,
+            List<Map.Entry<Integer, Integer>> shipsQueue,
+            List<ShipPlacement> result,
+            List<Map.Entry<Integer, Integer>> cells,
+            boolean enforceHalfField
+    ) {
+        for (Map.Entry<Integer, Integer> cell : cells) {
+            if (shipsQueue.isEmpty()) break;
+
+            int row = cell.getKey();
+            int col = cell.getValue();
+
+            // Пытаемся разместить любой корабль из очереди в этой клетке
+            if (!tryPlaceAnyShip(occupied, shipsQueue, result, row, col, enforceHalfField)) {
+                continue;
+            }
+        }
+
+        return shipsQueue.isEmpty();
+    }
+
+    private boolean tryPlaceAnyShip(
+            boolean[][] occupied,
+            List<Map.Entry<Integer, Integer>> shipsQueue,
+            List<ShipPlacement> result,
+            int row, int col,
+            boolean enforceHalfField
+    ) {
+        // Создаем копию для безопасной итерации
+        List<Map.Entry<Integer, Integer>> queueCopy = new ArrayList<>(shipsQueue);
+
+        for (Map.Entry<Integer, Integer> ship : queueCopy) {
+            if (tryPlaceShip(occupied, ship, row, col, result, enforceHalfField)) {
+                shipsQueue.remove(ship);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean tryPlaceShip(
+            boolean[][] occupied,
+            Map.Entry<Integer, Integer> ship,
+            int row, int col,
+            List<ShipPlacement> result,
+            boolean enforceHalfField
+    ) {
+        int size = ship.getKey();
+        int shipId = ship.getValue();
+
+        // Пробуем обе ориентации в случайном порядке
+        List<Boolean> orientations = Arrays.asList(true, false);
+        Collections.shuffle(orientations, rand);
+
+        for (boolean horizontal : orientations) {
+            if (enforceHalfField && !isWithinPrimaryHalf(col, size, horizontal)) {
+                continue;
+            }
+
+            if (tryPlace(occupied, col, row, size, horizontal)) {
+                result.add(new ShipPlacement(shipId, size, row, col, !horizontal));
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ===============================================================================
+    // Генерация клеток (ОПТИМИЗИРОВАНА)
+    // ===============================================================================
+
+    private List<Map.Entry<Integer, Integer>> generatePrimaryHalfCells() {
         List<Map.Entry<Integer, Integer>> cells = new ArrayList<>();
 
-        addPrimaryHalfCells(cells);
+        for (int row = 0; row < BOARD_SIZE; row++) {
+            for (int col : primaryColumns) {
+                cells.add(cell(row, col));
+            }
+        }
 
-        if (includeSecondary) {
-            addSecondaryHalfCells(cells);
+        Collections.shuffle(cells, rand);
+        return cells;
+    }
+
+    private List<Map.Entry<Integer, Integer>> generateAllCellsPrioritized() {
+
+        // Сначала добавляем клетки из основной половины
+        List<Map.Entry<Integer, Integer>> cells = new ArrayList<>(generatePrimaryHalfCells());
+
+        // Затем добавляем клетки из вторичной половины
+        List<Integer> secondaryColumns = getSecondaryColumns();
+        for (int row = 0; row < BOARD_SIZE; row++) {
+            for (int col : secondaryColumns) {
+                cells.add(cell(row, col));
+            }
         }
 
         return cells;
     }
 
-    private void addPrimaryHalfCells(List<Map.Entry<Integer, Integer>> cells) {
-        for (int row = 0; row <= 9; row++) {
-            for (int col : primaryCols) {
-                cells.add(new AbstractMap.SimpleEntry<>(row, col));
-            }
+    private List<Integer> createPrimaryColumns() {
+        List<Integer> columns = new ArrayList<>();
+        int startCol = useLeftHalf ? 0 : BOARD_SIZE / 2;
+        int endCol = useLeftHalf ? (BOARD_SIZE / 2) - 1 : BOARD_SIZE - 1;
+
+        for (int col = startCol; col <= endCol; col++) {
+            columns.add(col);
         }
+        return columns;
     }
 
-    private void addSecondaryHalfCells(List<Map.Entry<Integer, Integer>> cells) {
-        // Добавляем резервную половину в обратном порядке по строкам
-        List<Integer> secondaryCols = getSecondaryCols();
+    private List<Integer> getSecondaryColumns() {
+        List<Integer> columns = new ArrayList<>();
+        int startCol = useLeftHalf ? BOARD_SIZE / 2 : 0;
+        int endCol = useLeftHalf ? BOARD_SIZE - 1 : (BOARD_SIZE / 2) - 1;
 
-        for (int row = 9; row >= 0; row--) {
-            for (int col : secondaryCols) {
-                cells.add(new AbstractMap.SimpleEntry<>(row, col));
-            }
+        for (int col = startCol; col <= endCol; col++) {
+            columns.add(col);
         }
+        return columns;
     }
 
-    private List<Integer> getSecondaryCols() {
-        List<Integer> cols = new ArrayList<>();
-        if (useLeft) {
-            // Правая половина: 5-9
-            for (int c = 5; c <= 9; c++) {
-                cols.add(c);
-            }
+    // ===============================================================================
+    // Проверки ограничений
+    // ===============================================================================
+
+    private boolean isWithinPrimaryHalf(int startCol, int size, boolean horizontal) {
+        int endCol = startCol + (horizontal ? size - 1 : 0);
+
+        if (useLeftHalf) {
+            return startCol >= 0 && startCol < BOARD_SIZE / 2 &&
+                    endCol >= 0 && endCol < BOARD_SIZE / 2;
         } else {
-            // Левая половина: 0-4
-            for (int c = 4; c >= 0; c--) {
-                cols.add(c);
-            }
+            return startCol >= BOARD_SIZE / 2 && startCol < BOARD_SIZE &&
+                    endCol >= BOARD_SIZE / 2 && endCol < BOARD_SIZE;
         }
-        return cols;
     }
 
     @Override
     protected boolean canPlace(
-            boolean[][] occ,
-            int x0, int y0,
+            boolean[][] occupied,
+            int startX, int startY,
             int size,
             boolean horizontal
     ) {
-        if (!super.canPlace(occ, x0, y0, size, horizontal)) {
-            return false;
-        }
+        // Всегда вызываем базовую проверку сначала
+        return super.canPlace(occupied, startX, startY, size, horizontal);
 
-        return isWithinPrimaryHalf(x0, size, horizontal);
+        // Дополнительная проверка на половину поля не нужна здесь,
+        // так как мы контролируем это в tryPlaceShip
     }
 
-    private boolean isWithinPrimaryHalf(int startX, int size, boolean horizontal) {
-        int dx = horizontal ? 1 : 0;
-        int endX = startX + dx * (size - 1);
+    // ===============================================================================
+    // Методы для анализа и тестирования
+    // ===============================================================================
 
-        if (useLeft) {
-            return startX >= 0 && startX <= 4 && endX >= 0 && endX <= 4;
+    /**
+     * Возвращает статистику по размещению
+     */
+    public PlacementStatistics getPlacementStatistics(List<ShipPlacement> placements) {
+        int primaryHalfShips = 0;
+        int secondaryHalfShips = 0;
+
+        for (ShipPlacement placement : placements) {
+            if (isInPrimaryHalf(placement)) {
+                primaryHalfShips++;
+            } else {
+                secondaryHalfShips++;
+            }
+        }
+
+        return new PlacementStatistics(
+                placements.size(),
+                primaryHalfShips,
+                secondaryHalfShips,
+                useLeftHalf ? "LEFT" : "RIGHT"
+        );
+    }
+
+    private boolean isInPrimaryHalf(ShipPlacement placement) {
+        boolean isHorizontal = !placement.isVertical();
+        int startCol = placement.getCol();
+        int size = placement.getSize();
+        int endCol = startCol + (isHorizontal ? size - 1 : 0);
+
+        if (useLeftHalf) {
+            return endCol < BOARD_SIZE / 2;
         } else {
-            return startX >= 5 && startX <= 9 && endX >= 5 && endX <= 9;
+            return startCol >= BOARD_SIZE / 2;
         }
     }
 
-    private class PlacementAttempt {
-        private final boolean[][] occupied;
-        private final List<Map.Entry<Integer, Integer>> shipQueue;
-        @Getter
-        private final List<ShipPlacement> result;
-        private final List<Map.Entry<Integer, Integer>> cells;
-
-        public PlacementAttempt(boolean useFullField) {
-            this.occupied = new boolean[10][10];
-            this.shipQueue = new ArrayList<>(getFleet());
-            this.result = new ArrayList<>();
-            this.cells = useFullField ? scanCellsAll() : scanCells();
-            Collections.shuffle(shipQueue, rand);
-        }
-        private List<Map.Entry<Integer, Integer>> scanCellsAll() {
-            return generateCellList(true);
-        }
-
-        public boolean execute() {
-            for (Map.Entry<Integer, Integer> cell : cells) {
-                if (shipQueue.isEmpty()) break;
-                processCell(cell);
-            }
-            return shipQueue.isEmpty();
-        }
-
-        private void processCell(Map.Entry<Integer, Integer> cell) {
-            int r = cell.getKey();
-            int c = cell.getValue();
-
-            int tries = 0;
-            while (tries < shipQueue.size()) {
-                Map.Entry<Integer, Integer> ship = shipQueue.removeFirst();
-                int size = ship.getKey();
-                int shipId = ship.getValue();
-
-                if (tryPlaceShip(shipId, size, r, c)) {
-                    break;
-                }
-
-                shipQueue.add(ship);
-                tries++;
-            }
-        }
-
-        private boolean tryPlaceShip(int shipId, int size, int row, int col) {
-            List<Boolean> orientations = Arrays.asList(true, false);
-            Collections.shuffle(orientations, rand);
-
-            for (boolean horizontal : orientations) {
-                if (tryPlace(occupied, col, row, size, horizontal)) {
-                    result.add(new ShipPlacement(shipId, size, row, col, !horizontal));
-                    return true;
-                }
-            }
+    /**
+     * Проверяет, соответствует ли размещение стратегии половины поля
+     */
+    public boolean isValidHalfFieldPlacement(List<ShipPlacement> placements) {
+        if (!isValidPlacement(placements)) {
             return false;
         }
 
+        // Для стратегии половины поля проверяем, что большинство кораблей в основной половине
+        PlacementStatistics stats = getPlacementStatistics(placements);
+        return stats.getPrimaryHalfShips() >= stats.getSecondaryHalfShips();
+    }
+
+    // ===============================================================================
+    // Вспомогательные классы
+    // ===============================================================================
+
+    @Getter
+    public class PlacementStatistics {
+        private final int totalShips;
+        private final int primaryHalfShips;
+        private final int secondaryHalfShips;
+        private final String primaryHalf;
+        private final double primaryPercentage;
+
+        public PlacementStatistics(int totalShips, int primaryHalfShips, int secondaryHalfShips, String primaryHalf) {
+            this.totalShips = totalShips;
+            this.primaryHalfShips = primaryHalfShips;
+            this.secondaryHalfShips = secondaryHalfShips;
+            this.primaryHalf = primaryHalf;
+            this.primaryPercentage = totalShips > 0 ? (double) primaryHalfShips / totalShips * 100 : 0;
+        }
+
+        @Override
+        public String toString() {
+            return String.format(
+                    "HalfFieldPlacer Statistics: %s half=%s, primary=%d (%.1f%%), secondary=%d",
+                    primaryHalf, useLeftHalf ? "LEFT" : "RIGHT",
+                    primaryHalfShips, primaryPercentage, secondaryHalfShips
+            );
+        }
+    }
+
+    // ===============================================================================
+    // Методы для конфигурации
+    // ===============================================================================
+
+    /**
+     * Возвращает границы выбранной половины
+     */
+    public String getHalfBoundaries() {
+        if (useLeftHalf) {
+            return String.format("Columns: 0-%d", (BOARD_SIZE / 2) - 1);
+        } else {
+            return String.format("Columns: %d-%d", BOARD_SIZE / 2, BOARD_SIZE - 1);
+        }
+    }
+
+    /**
+     * Возвращает количество клеток в основной половине
+     */
+    public int getPrimaryHalfCellCount() {
+        return BOARD_SIZE * (BOARD_SIZE / 2);
+    }
+
+    /**
+     * Для отладки: выводит информацию о стратегии
+     */
+    public void printStrategyInfo() {
+        System.out.println("HalfFieldPlacer Strategy Info:");
+        System.out.println("Primary half: " + (useLeftHalf ? "LEFT" : "RIGHT"));
+        System.out.println("Primary columns: " + primaryColumns);
+        System.out.println("Primary cells count: " + getPrimaryHalfCellCount());
+        System.out.println("Boundaries: " + getHalfBoundaries());
     }
 }

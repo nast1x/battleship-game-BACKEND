@@ -7,7 +7,8 @@ import java.util.stream.Collectors;
 
 /**
  * Стратегия «Диагональная с вероятностным расширенным поиском».
- * Приоритет ходов: **hunt-режим > диагональная фаза > probability-режим**.
+ * Приоритет ходов: hunt-режим > диагональная фаза > probability-режим.
+ * Синхронизирована с BaseShootingStrategy.
  */
 public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
 
@@ -60,12 +61,15 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
     }
 
     // ===============================================================================
-    // Основная логика выстрела
+    // Основная логика выстрела (СИНХРОНИЗИРОВАНА)
     // ===============================================================================
 
     @Override
     protected ShotCoordinate computeNextShot() {
-        // 1. Hunt-режим (добивание)
+        // Синхронизация: обновляем board на основе tried[][]
+        syncBoardWithTried();
+
+        // 1. Hunt-режим (добивание) - используем базовую логику с дополнительной проверкой board
         ShotCoordinate huntShot = getShotFromHuntQueue(cell ->
                 board[cell.y()][cell.x()] == CellState.EMPTY
         );
@@ -94,6 +98,10 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
     protected void onShotResult(ShotCoordinate lastShot, boolean hit, boolean sunk) {
         if (lastShot == null) return;
 
+        // Синхронизация: сначала обновляем board
+        updateBoardState(lastShot, hit, sunk);
+
+        // Затем обрабатываем логику
         if (hit && sunk) {
             handleSunkShip(lastShot);
         } else if (hit) {
@@ -104,7 +112,46 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
     }
 
     // ===============================================================================
-    // Диагональная фаза
+    // Методы синхронизации с базовым классом
+    // ===============================================================================
+
+    /**
+     * Синхронизирует состояние board с tried[][] из базового класса
+     */
+    private void syncBoardWithTried() {
+        for (int row = 0; row < SIZE; row++) {
+            for (int col = 0; col < SIZE; col++) {
+                if (isCellTried(row, col) && board[row][col] == CellState.EMPTY) {
+                    // Если клетка обстреляна в базовом классе, но у нас помечена как EMPTY,
+                    // значит это промах (т.к. попадания обрабатываются в onShotResult)
+                    board[row][col] = CellState.MISS;
+                }
+            }
+        }
+    }
+
+    /**
+     * Обновляет состояние board на основе результата выстрела
+     */
+    private void updateBoardState(ShotCoordinate shot, boolean hit, boolean sunk) {
+        if (sunk) {
+            board[shot.y()][shot.x()] = CellState.SUNK;
+        } else if (hit) {
+            board[shot.y()][shot.x()] = CellState.HIT;
+        } else {
+            board[shot.y()][shot.x()] = CellState.MISS;
+        }
+    }
+
+    /**
+     * Проверяет, доступна ли клетка для выстрела (синхронизированная проверка)
+     */
+    private boolean isCellAvailable(ShotCoordinate cell) {
+        return board[cell.y()][cell.x()] == CellState.EMPTY && isCellUntried(cell);
+    }
+
+    // ===============================================================================
+    // Диагональная фаза (СИНХРОНИЗИРОВАНА)
     // ===============================================================================
 
     private int calculateDynamicThreshold(int largestShip) {
@@ -120,7 +167,7 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
         if (useMain) {
             while (mainIndex < mainShots.size()) {
                 ShotCoordinate cell = mainShots.get(mainIndex++);
-                if (board[cell.y()][cell.x()] == CellState.EMPTY && isCellUntried(cell)) {
+                if (isCellAvailable(cell)) {
                     return cell;
                 }
             }
@@ -129,7 +176,7 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
         } else {
             while (secondaryIndex < secondaryShots.size()) {
                 ShotCoordinate cell = secondaryShots.get(secondaryIndex++);
-                if (board[cell.y()][cell.x()] == CellState.EMPTY && isCellUntried(cell)) {
+                if (isCellAvailable(cell)) {
                     return cell;
                 }
             }
@@ -139,7 +186,7 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
     }
 
     // ===============================================================================
-    // Вероятностный режим (общие методы, которые можно вынести в утилитный класс)
+    // Вероятностный режим (СИНХРОНИЗИРОВАН)
     // ===============================================================================
 
     private ShotCoordinate computeProbabilityShot() {
@@ -214,7 +261,7 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
         int maxCount = 0;
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
-                if (board[r][c] == CellState.EMPTY && counts[r][c] > maxCount) {
+                if (isCellAvailable(ShotCoordinate.of(c, r)) && counts[r][c] > maxCount) {
                     maxCount = counts[r][c];
                 }
             }
@@ -226,8 +273,9 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
         List<ShotCoordinate> candidates = new ArrayList<>();
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
-                if (board[r][c] == CellState.EMPTY && counts[r][c] == maxCount) {
-                    candidates.add(ShotCoordinate.of(c, r));
+                ShotCoordinate cell = ShotCoordinate.of(c, r);
+                if (isCellAvailable(cell) && counts[r][c] == maxCount) {
+                    candidates.add(cell);
                 }
             }
         }
@@ -238,16 +286,17 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
                 ShotCoordinate coordinate = ShotCoordinate.of(c, r);
-                if (board[r][c] == CellState.EMPTY && isCellUntried(coordinate)) {
+                if (isCellAvailable(coordinate)) {
                     return coordinate;
                 }
             }
         }
-        throw new IllegalStateException("No empty cell left");
+        // Fallback к базовому классу
+        return findAnyUntriedCell();
     }
 
     // ===============================================================================
-    // Обработка результатов выстрела (общие методы)
+    // Обработка результатов выстрела (СИНХРОНИЗИРОВАНА)
     // ===============================================================================
 
     private void handleSunkShip(ShotCoordinate shot) {
@@ -263,19 +312,20 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
         int justSunkLen = chain.size();
         markBufferAround(chain);
         remainingShips.remove(Integer.valueOf(justSunkLen));
+
+        // Используем базовый метод для сброса hunt-режима
         resetHuntMode();
         consecutiveMisses = 0;
     }
 
     private void handleHit(ShotCoordinate shot) {
-        board[shot.y()][shot.x()] = CellState.HIT;
         huntHits.add(shot);
+        // Используем базовый метод для построения очереди добивания
         enqueueBasedOnHits();
         consecutiveMisses = 0;
     }
 
-    private void handleMiss(ShotCoordinate shot) {
-        board[shot.y()][shot.x()] = CellState.MISS;
+    private void handleMiss(/*ShotCoordinate shot*/ShotCoordinate lastShot) {
         consecutiveMisses++;
     }
 
@@ -362,7 +412,11 @@ public class DiagonalProbabilityStrategy extends BaseShootingStrategy {
         return new ArrayList<>(remainingShips);
     }
 
-    private CellState getCellState(int row, int col) {
+    public CellState getCellState(int row, int col) {
         return board[row][col];
+    }
+
+    public int getBoardSize() {
+        return SIZE;
     }
 }

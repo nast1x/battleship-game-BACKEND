@@ -12,12 +12,14 @@ import java.util.*;
 @Component
 public abstract class BasePlacementStrategy {
 
-    protected Random rand;
+    protected static final int BOARD_SIZE = 10;
+    protected static final int MAX_ATTEMPTS = 1000;
 
+    protected Random rand;
     protected PlacementStrategyRepository placementStrategyRepository;
 
-    /** Флот: (длина → уникальный shipId) */
-    private final List<Map.Entry<Integer, Integer>> fleet = Arrays.asList(
+    /** Флот: (длина → уникальный shipId) - неизменяемый */
+    private static final List<Map.Entry<Integer, Integer>> FLEET = List.of(
             new AbstractMap.SimpleEntry<>(4, 1),
             new AbstractMap.SimpleEntry<>(3, 2),
             new AbstractMap.SimpleEntry<>(3, 3),
@@ -30,33 +32,39 @@ public abstract class BasePlacementStrategy {
             new AbstractMap.SimpleEntry<>(1, 10)
     );
 
-    protected BasePlacementStrategy() {
+    // ===============================================================================
+    // Конструкторы (ИСПРАВЛЕННЫЕ)
+    // ===============================================================================
+
+    /**
+     * Конструктор по умолчанию для Spring
+     */
+    @Autowired
+    protected BasePlacementStrategy(PlacementStrategyRepository placementStrategyRepository) {
+        this.placementStrategyRepository = placementStrategyRepository;
         this.rand = new Random();
     }
 
-    protected BasePlacementStrategy(Random rand) {
+    /**
+     * Конструктор для тестирования с контролируемым Random
+     */
+    protected BasePlacementStrategy(PlacementStrategyRepository placementStrategyRepository, Random rand) {
+        this.placementStrategyRepository = placementStrategyRepository;
         this.rand = rand;
     }
 
-    @Autowired
-   protected BasePlacementStrategy(PlacementStrategyRepository placementStrategyRepository) {
-        this.placementStrategyRepository = placementStrategyRepository;
-    }
-
-    // Удаляем конструктор с @Autowired для Random и PlacementStrategyRepository
-    // Spring будет использовать setter injection для placementStrategyRepository
-
-    protected List<Map.Entry<Integer, Integer>> getFleet() {
-        return new ArrayList<>(fleet);
-    }
+    // ===============================================================================
+    // Публичные методы
+    // ===============================================================================
 
     /**
      * Генерирует расстановку и сохраняет её для указанного игрока
      */
     public PlacementStrategy generateAndSavePlacement(Player player, String strategyName) {
+        validatePlayerAndStrategyName(player, strategyName);
+
         List<ShipPlacement> placements = generatePlacement();
 
-        // Создаем или обновляем запись стратегии
         PlacementStrategy strategy = placementStrategyRepository
                 .findByPlayerAndStrategyName(player, strategyName)
                 .orElse(new PlacementStrategy());
@@ -72,136 +80,92 @@ public abstract class BasePlacementStrategy {
      * Генерирует расстановку кораблей
      */
     public List<ShipPlacement> generatePlacement() {
-        final int maxAttempts = 1000;
-
-        for (int attempt = 0; attempt < maxAttempts; attempt++) {
+        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             List<ShipPlacement> result = attemptPlacement();
             if (result != null) {
-                return result;
+                return Collections.unmodifiableList(result);
             }
         }
 
-        throw new IllegalStateException("Failed to generate ship placement after " + maxAttempts + " attempts");
-    }
-
-    private List<ShipPlacement> attemptPlacement() {
-        boolean[][] occ = new boolean[10][10];
-        List<Map.Entry<Integer, Integer>> queue = new ArrayList<>(getFleet());
-        Collections.shuffle(queue, rand);
-        List<ShipPlacement> result = new ArrayList<>();
-        List<Map.Entry<Integer, Integer>> cells = scanCells();
-
-        for (Map.Entry<Integer, Integer> cell : cells) {
-            if (queue.isEmpty()) {
-                break;
-            }
-
-            if (!tryPlaceShipsInQueue(occ, queue, result, cell)) {
-                return null; // Не удалось разместить корабли в этой клетке
-            }
-        }
-
-        return queue.isEmpty() ? result : null;
-    }
-
-    private boolean tryPlaceShipsInQueue(
-            boolean[][] occ,
-            List<Map.Entry<Integer, Integer>> queue,
-            List<ShipPlacement> result,
-            Map.Entry<Integer, Integer> cell) {
-
-        int r = cell.getKey();
-        int c = cell.getValue();
-        int initialQueueSize = queue.size();
-
-        for (int tries = 0; tries < initialQueueSize; tries++) {
-            Map.Entry<Integer, Integer> ship = queue.removeFirst();
-
-            if (tryPlaceShipAtCell(occ, ship, r, c, result)) {
-                return true; // Успешно разместили корабль
-            }
-
-            queue.add(ship); // Возвращаем корабль в очередь
-        }
-
-        return false; // Не удалось разместить ни один корабль в этой клетке
-    }
-
-    private boolean tryPlaceShipAtCell(
-            boolean[][] occ,
-            Map.Entry<Integer, Integer> ship,
-            int row, int col,
-            List<ShipPlacement> result) {
-
-        int size = ship.getKey();
-        int shipId = ship.getValue();
-
-        List<Boolean> orientations = Arrays.asList(true, false);
-        Collections.shuffle(orientations, rand);
-
-        for (boolean horizontal : orientations) {
-            if (tryPlace(occ, col, row, size, horizontal)) {
-                result.add(new ShipPlacement(shipId, size, row, col, !horizontal));
-                return true;
-            }
-        }
-
-        return false;
+        throw new IllegalStateException(
+                String.format("Failed to generate ship placement after %d attempts", MAX_ATTEMPTS)
+        );
     }
 
     /**
      * Загружает сохраненную расстановку для игрока
      */
     public List<ShipPlacement> loadPlacement(Player player, String strategyName) {
+        validatePlayerAndStrategyName(player, strategyName);
+
         return placementStrategyRepository
                 .findByPlayerAndStrategyName(player, strategyName)
                 .map(PlacementStrategy::getPlacementDataAsList)
                 .orElse(Collections.emptyList());
     }
 
+    // ===============================================================================
+    // Защищенные методы для наследников
+    // ===============================================================================
+
+    /**
+     * Возвращает неизменяемую копию флота
+     */
+    protected List<Map.Entry<Integer, Integer>> getFleet() {
+        return new ArrayList<>(FLEET);
+    }
+
+    /**
+     * Проверяет возможность размещения корабля с учетом соседних клеток
+     */
     protected boolean canPlace(
-            boolean[][] occ,
-            int x0, int y0,
+            boolean[][] occupied,
+            int startX, int startY,
             int size,
             boolean horizontal
     ) {
         int dx = horizontal ? 1 : 0;
         int dy = horizontal ? 0 : 1;
-        int endX = x0 + dx * (size - 1);
-        int endY = y0 + dy * (size - 1);
+        int endX = startX + dx * (size - 1);
+        int endY = startY + dy * (size - 1);
 
-        if (endX < 0 || endX > 9 || endY < 0 || endY > 9) return false;
+        // Проверка границ
+        if (endX < 0 || endX >= BOARD_SIZE || endY < 0 || endY >= BOARD_SIZE) {
+            return false;
+        }
 
+        // Проверка соседних клеток
         for (int k = 0; k < size; k++) {
-            int x = x0 + dx * k;
-            int y = y0 + dy * k;
+            int x = startX + dx * k;
+            int y = startY + dy * k;
 
-            for (int ry = y - 1; ry <= y + 1; ry++) {
-                for (int rx = x - 1; rx <= x + 1; rx++) {
-                    if (rx >= 0 && rx <= 9 && ry >= 0 && ry <= 9 && occ[ry][rx]) {
-                        return false;
-                    }
-                }
+            if (!isAreaClear(occupied, x, y)) {
+                return false;
             }
         }
         return true;
     }
 
+    /**
+     * Размещает корабль на поле, если это возможно
+     */
     protected boolean tryPlace(
-            boolean[][] occ,
-            int x0, int y0,
+            boolean[][] occupied,
+            int startX, int startY,
             int size,
             boolean horizontal
     ) {
-        if (!canPlace(occ, x0, y0, size, horizontal)) return false;
+        if (!canPlace(occupied, startX, startY, size, horizontal)) {
+            return false;
+        }
 
         int dx = horizontal ? 1 : 0;
         int dy = horizontal ? 0 : 1;
 
         for (int k = 0; k < size; k++) {
-            int x = x0 + dx * k;
-            int y = y0 + dy * k;
-            occ[y][x] = true;
+            int x = startX + dx * k;
+            int y = startY + dy * k;
+            occupied[y][x] = true;
         }
 
         return true;
@@ -212,4 +176,171 @@ public abstract class BasePlacementStrategy {
      * в котором мы будем пытаться там разместить корабли.
      */
     protected abstract List<Map.Entry<Integer, Integer>> scanCells();
+
+    // ===============================================================================
+    // Приватные методы (ИСПРАВЛЕННАЯ ЛОГИКА)
+    // ===============================================================================
+
+    private List<ShipPlacement> attemptPlacement() {
+        boolean[][] occupied = new boolean[BOARD_SIZE][BOARD_SIZE];
+        List<Map.Entry<Integer, Integer>> shipsQueue = new ArrayList<>(getFleet());
+        Collections.shuffle(shipsQueue, rand);
+
+        List<ShipPlacement> result = new ArrayList<>();
+        List<Map.Entry<Integer, Integer>> cells = scanCells();
+
+        // Пытаемся разместить корабли в заданном порядке клеток
+        for (Map.Entry<Integer, Integer> cell : cells) {
+            if (shipsQueue.isEmpty()) {
+                break;
+            }
+
+            // Пытаемся разместить любой корабль из очереди в текущей клетке
+            if (!placeAnyShipInCell(occupied, shipsQueue, result, cell)) {
+                continue; // Продолжаем со следующей клеткой
+            }
+        }
+
+        return shipsQueue.isEmpty() ? result : null;
+    }
+
+    private boolean placeAnyShipInCell(
+            boolean[][] occupied,
+            List<Map.Entry<Integer, Integer>> shipsQueue,
+            List<ShipPlacement> result,
+            Map.Entry<Integer, Integer> cell
+    ) {
+        int row = cell.getKey();
+        int col = cell.getValue();
+
+        // Создаем копию очереди для безопасной итерации
+        List<Map.Entry<Integer, Integer>> queueCopy = new ArrayList<>(shipsQueue);
+
+        for (Map.Entry<Integer, Integer> ship : queueCopy) {
+            if (tryPlaceShipAtCell(occupied, ship, row, col, result)) {
+                shipsQueue.remove(ship); // Удаляем только если успешно разместили
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private boolean tryPlaceShipAtCell(
+            boolean[][] occupied,
+            Map.Entry<Integer, Integer> ship,
+            int row, int col,
+            List<ShipPlacement> result
+    ) {
+        int size = ship.getKey();
+        int shipId = ship.getValue();
+
+        // Пробуем обе ориентации в случайном порядке
+        List<Boolean> orientations = Arrays.asList(true, false);
+        Collections.shuffle(orientations, rand);
+
+        for (boolean horizontal : orientations) {
+            if (tryPlace(occupied, col, row, size, horizontal)) {
+                // Важно: ShipPlacement использует (row, col, !horizontal) для вертикальной ориентации
+                result.add(new ShipPlacement(shipId, size, row, col, !horizontal));
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Проверяет, что область 3x3 вокруг клетки свободна
+     */
+    private boolean isAreaClear(boolean[][] occupied, int x, int y) {
+        for (int checkY = y - 1; checkY <= y + 1; checkY++) {
+            for (int checkX = x - 1; checkX <= x + 1; checkX++) {
+                if (checkX >= 0 && checkX < BOARD_SIZE &&
+                        checkY >= 0 && checkY < BOARD_SIZE &&
+                        occupied[checkY][checkX]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    // ===============================================================================
+    // Валидация и утилитные методы
+    // ===============================================================================
+
+    private void validatePlayerAndStrategyName(Player player, String strategyName) {
+        if (player == null) {
+            throw new IllegalArgumentException("Player cannot be null");
+        }
+        if (strategyName == null || strategyName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Strategy name cannot be null or empty");
+        }
+    }
+
+    /**
+     * Вспомогательный метод для создания клетки
+     */
+    protected Map.Entry<Integer, Integer> cell(int row, int col) {
+        return new AbstractMap.SimpleEntry<>(row, col);
+    }
+
+    /**
+     * Генерирует все клетки поля в порядке строк
+     */
+    protected List<Map.Entry<Integer, Integer>> generateAllCells() {
+        List<Map.Entry<Integer, Integer>> allCells = new ArrayList<>();
+        for (int row = 0; row < BOARD_SIZE; row++) {
+            for (int col = 0; col < BOARD_SIZE; col++) {
+                allCells.add(cell(row, col));
+            }
+        }
+        return allCells;
+    }
+
+    /**
+     * Генерирует клетки в случайном порядке
+     */
+    protected List<Map.Entry<Integer, Integer>> generateRandomCells() {
+        List<Map.Entry<Integer, Integer>> cells = generateAllCells();
+        Collections.shuffle(cells, rand);
+        return cells;
+    }
+
+    // ===============================================================================
+    // Методы для тестирования
+    // ===============================================================================
+
+    /**
+     * Для тестирования: проверяет валидность расстановки
+     */
+    public boolean isValidPlacement(List<ShipPlacement> placements) {
+        if (placements == null || placements.size() != FLEET.size()) {
+            return false;
+        }
+
+        boolean[][] occupied = new boolean[BOARD_SIZE][BOARD_SIZE];
+
+        for (ShipPlacement placement : placements) {
+            int size = placement.getSize();
+            boolean horizontal = !placement.isVertical(); // Конвертируем обратно
+
+            if (!canPlace(occupied, placement.getCol(), placement.getRow(), size, horizontal)) {
+                return false;
+            }
+
+            // Размещаем корабль
+            int dx = horizontal ? 1 : 0;
+            int dy = horizontal ? 0 : 1;
+
+            for (int k = 0; k < size; k++) {
+                int x = placement.getCol() + dx * k;
+                int y = placement.getRow() + dy * k;
+                occupied[y][x] = true;
+            }
+        }
+
+        return true;
+    }
 }

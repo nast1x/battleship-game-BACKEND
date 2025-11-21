@@ -6,6 +6,7 @@ import java.util.*;
 
 /**
  * Стратегия «Сложный» с анализом плотности (Heatmap) и адаптивными коррекциями.
+ * Синхронизирована с BaseShootingStrategy.
  */
 public class DensityAnalysisStrategy extends BaseShootingStrategy {
 
@@ -35,11 +36,17 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         }
     }
 
+    // ===============================================================================
+    // Основная логика выстрела (СИНХРОНИЗИРОВАНА)
+    // ===============================================================================
+
     @Override
     protected ShotCoordinate computeNextShot() {
+        // Синхронизация: обновляем board на основе tried[][]
+        syncBoardWithTried();
+
         // ——— 1) Hunt-режим (добивание) ———
-        ShotCoordinate huntShot = getShotFromHuntQueue(cell ->
-                board[cell.y()][cell.x()] == CellState.EMPTY
+        ShotCoordinate huntShot = getShotFromHuntQueue(this::isCellAvailable
         );
         if (huntShot != null) {
             return huntShot;
@@ -53,6 +60,10 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     protected void onShotResult(ShotCoordinate lastShot, boolean hit, boolean sunk) {
         if (lastShot == null) return;
 
+        // Синхронизация: сначала обновляем board
+        updateBoardState(lastShot, hit, sunk);
+
+        // Затем обрабатываем логику
         if (hit && sunk) {
             handleSunkShip(lastShot);
         } else if (hit) {
@@ -61,6 +72,49 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
             handleMiss(lastShot);
         }
     }
+
+    // ===============================================================================
+    // Методы синхронизации с базовым классом
+    // ===============================================================================
+
+    /**
+     * Синхронизирует состояние board с tried[][] из базового класса
+     */
+    private void syncBoardWithTried() {
+        for (int row = 0; row < SIZE; row++) {
+            for (int col = 0; col < SIZE; col++) {
+                if (isCellTried(row, col) && board[row][col] == CellState.EMPTY) {
+                    // Если клетка обстреляна в базовом классе, но у нас помечена как EMPTY,
+                    // значит это промах (т.к. попадания обрабатываются в onShotResult)
+                    board[row][col] = CellState.MISS;
+                }
+            }
+        }
+    }
+
+    /**
+     * Обновляет состояние board на основе результата выстрела
+     */
+    private void updateBoardState(ShotCoordinate shot, boolean hit, boolean sunk) {
+        if (sunk) {
+            board[shot.y()][shot.x()] = CellState.SUNK;
+        } else if (hit) {
+            board[shot.y()][shot.x()] = CellState.HIT;
+        } else {
+            board[shot.y()][shot.x()] = CellState.MISS;
+        }
+    }
+
+    /**
+     * Проверяет, доступна ли клетка для выстрела (синхронизированная проверка)
+     */
+    private boolean isCellAvailable(ShotCoordinate cell) {
+        return board[cell.y()][cell.x()] == CellState.EMPTY && isCellUntried(cell);
+    }
+
+    // ===============================================================================
+    // Обработка результатов выстрела (СИНХРОНИЗИРОВАНА)
+    // ===============================================================================
 
     private void handleSunkShip(ShotCoordinate shot) {
         if (!huntHits.contains(shot)) {
@@ -75,66 +129,29 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         int justSunkLen = chain.size();
         markBufferAround(chain);
         remainingShips.remove(Integer.valueOf(justSunkLen));
+
+        // Используем базовый метод для сброса hunt-режима
         resetHuntMode();
         consecutiveMisses = 0;
     }
 
     private void handleHit(ShotCoordinate shot) {
-        board[shot.y()][shot.x()] = CellState.HIT;
         huntHits.add(shot);
+        // Используем базовый метод для построения очереди добивания
         enqueueBasedOnHits();
         consecutiveMisses = 0;
     }
 
     private void handleMiss(ShotCoordinate shot) {
-        board[shot.y()][shot.x()] = CellState.MISS;
         consecutiveMisses++;
     }
 
+    // ===============================================================================
+    // Heatmap логика (СИНХРОНИЗИРОВАНА)
+    // ===============================================================================
+
     private ShotCoordinate computeHeatmapShot() {
-        int[][] counts = new int[SIZE][SIZE];
-
-        for (int shipWeight : remainingShips) {
-            boolean includeVertical = (shipWeight > 1);
-
-            // Горизонтальные варианты
-            for (int r = 0; r < SIZE; r++) {
-                for (int c = 0; c <= SIZE - shipWeight; c++) {
-                    boolean canPlace = true;
-                    for (int k = 0; k < shipWeight; k++) {
-                        if (board[r][c + k] != CellState.EMPTY) {
-                            canPlace = false;
-                            break;
-                        }
-                    }
-                    if (canPlace) {
-                        for (int k = 0; k < shipWeight; k++) {
-                            counts[r][c + k] += shipWeight;
-                        }
-                    }
-                }
-            }
-
-            if (includeVertical) {
-                // Вертикальные варианты
-                for (int c = 0; c < SIZE; c++) {
-                    for (int r = 0; r <= SIZE - shipWeight; r++) {
-                        boolean canPlace = true;
-                        for (int k = 0; k < shipWeight; k++) {
-                            if (board[r + k][c] != CellState.EMPTY) {
-                                canPlace = false;
-                                break;
-                            }
-                        }
-                        if (canPlace) {
-                            for (int k = 0; k < shipWeight; k++) {
-                                counts[r + k][c] += shipWeight;
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        int[][] counts = buildProbabilityHeatmap();
 
         if (consecutiveMisses >= EDGE_BONUS_THRESHOLD) {
             applyEdgeBonus(counts);
@@ -150,12 +167,64 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         return findFirstEmptyCell();
     }
 
+    private int[][] buildProbabilityHeatmap() {
+        int[][] counts = new int[SIZE][SIZE];
+
+        for (int shipWeight : remainingShips) {
+            boolean includeVertical = (shipWeight > 1);
+
+            // Горизонтальные варианты
+            for (int r = 0; r < SIZE; r++) {
+                for (int c = 0; c <= SIZE - shipWeight; c++) {
+                    if (canPlaceShipHorizontally(r, c, shipWeight)) {
+                        for (int k = 0; k < shipWeight; k++) {
+                            counts[r][c + k] += shipWeight;
+                        }
+                    }
+                }
+            }
+
+            if (includeVertical) {
+                // Вертикальные варианты
+                for (int c = 0; c < SIZE; c++) {
+                    for (int r = 0; r <= SIZE - shipWeight; r++) {
+                        if (canPlaceShipVertically(r, c, shipWeight)) {
+                            for (int k = 0; k < shipWeight; k++) {
+                                counts[r + k][c] += shipWeight;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return counts;
+    }
+
+    private boolean canPlaceShipHorizontally(int row, int startCol, int length) {
+        for (int k = 0; k < length; k++) {
+            if (board[row][startCol + k] != CellState.EMPTY) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean canPlaceShipVertically(int startRow, int col, int length) {
+        for (int k = 0; k < length; k++) {
+            if (board[startRow + k][col] != CellState.EMPTY) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     private void applyEdgeBonus(int[][] counts) {
         for (int i = 0; i < SIZE; i++) {
-            if (board[0][i] == CellState.EMPTY) counts[0][i] += 10;
-            if (board[SIZE - 1][i] == CellState.EMPTY) counts[SIZE - 1][i] += 10;
-            if (board[i][0] == CellState.EMPTY) counts[i][0] += 10;
-            if (board[i][SIZE - 1] == CellState.EMPTY) counts[i][SIZE - 1] += 10;
+            if (isCellAvailable(ShotCoordinate.of(i, 0))) counts[0][i] += 10;
+            if (isCellAvailable(ShotCoordinate.of(i, SIZE - 1))) counts[SIZE - 1][i] += 10;
+            if (isCellAvailable(ShotCoordinate.of(0, i))) counts[i][0] += 10;
+            if (isCellAvailable(ShotCoordinate.of(SIZE - 1, i))) counts[i][SIZE - 1] += 10;
         }
     }
 
@@ -163,7 +232,8 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         int maxCount = 0;
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
-                if (board[r][c] == CellState.EMPTY && counts[r][c] > maxCount) {
+                ShotCoordinate cell = ShotCoordinate.of(c, r);
+                if (isCellAvailable(cell) && counts[r][c] > maxCount) {
                     maxCount = counts[r][c];
                 }
             }
@@ -175,8 +245,9 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         List<ShotCoordinate> candidates = new ArrayList<>();
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
-                if (board[r][c] == CellState.EMPTY && counts[r][c] == maxCount) {
-                    candidates.add(ShotCoordinate.of(c, r));
+                ShotCoordinate cell = ShotCoordinate.of(c, r);
+                if (isCellAvailable(cell) && counts[r][c] == maxCount) {
+                    candidates.add(cell);
                 }
             }
         }
@@ -187,13 +258,18 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
                 ShotCoordinate coordinate = ShotCoordinate.of(c, r);
-                if (board[r][c] == CellState.EMPTY && isCellUntried(coordinate)) {
+                if (isCellAvailable(coordinate)) {
                     return coordinate;
                 }
             }
         }
-        throw new IllegalStateException("No empty cell left");
+        // Fallback к базовому классу
+        return findAnyUntriedCell();
     }
+
+    // ===============================================================================
+    // Вспомогательные методы для работы с цепочками кораблей
+    // ===============================================================================
 
     private List<ShotCoordinate> findSunkChain(List<ShotCoordinate> hits, ShotCoordinate start) {
         int r = start.y();
@@ -261,5 +337,24 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
 
     public boolean isInHuntMode() {
         return !huntQueue.isEmpty() || !huntHits.isEmpty();
+    }
+
+    /**
+     * Проверяет синхронизацию между board и tried[][]
+     */
+    public void validateSynchronization() {
+        for (int row = 0; row < SIZE; row++) {
+            for (int col = 0; col < SIZE; col++) {
+                ShotCoordinate cell = ShotCoordinate.of(col, row);
+                boolean isTried = isCellTried(cell);
+                CellState state = board[row][col];
+
+                // Проверка согласованности
+                if (isTried && state == CellState.EMPTY) {
+                    throw new IllegalStateException("Synchronization error: cell " + cell +
+                            " is tried but marked as EMPTY in board");
+                }
+            }
+        }
     }
 }
