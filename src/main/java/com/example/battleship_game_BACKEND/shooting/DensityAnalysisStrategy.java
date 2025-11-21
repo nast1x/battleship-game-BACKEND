@@ -1,5 +1,7 @@
 package com.example.battleship_game_BACKEND.shooting;
 
+import lombok.Getter;
+
 import java.util.*;
 
 /**
@@ -19,10 +21,10 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     private final List<Integer> remainingShips = new ArrayList<>(INITIAL_SHIPS);
 
     /** Счётчик подряд промахов. */
+    @Getter
     private int consecutiveMisses = 0;
 
     private final Random random = new Random();
-    private ShotCoordinate lastShot;
 
     public DensityAnalysisStrategy() {
         // Инициализация поля
@@ -36,56 +38,40 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     @Override
     protected ShotCoordinate computeNextShot() {
         // ——— 1) Hunt-режим (добивание) ———
-        ShotCoordinate cell = getShotCoordinate();
-        if (cell != null) return cell;
+        ShotCoordinate huntShot = getShotFromHuntQueue(cell ->
+                board[cell.y()][cell.x()] == CellState.EMPTY
+        );
+        if (huntShot != null) {
+            return huntShot;
+        }
 
         // ——— 2) Heatmap-режим ———
         return computeHeatmapShot();
     }
 
-    private ShotCoordinate getShotCoordinate() {
-        if (!huntQueue.isEmpty()) {
-            while (!huntQueue.isEmpty()) {
-                ShotCoordinate cell = huntQueue.removeFirst();
-                if (isValidCell(cell) &&
-                        board[cell.y()][cell.x()] == CellState.EMPTY &&
-                        hasTried(cell)) {
-                    return cell;
-                }
-            }
-            huntQueue.clear();
-        }
-        return null;
-    }
-
     @Override
-    public ShotCoordinate getNextShot() {
-        ShotCoordinate nextShot = computeNextShot();
-        lastShot = nextShot;
-        return nextShot;
-    }
-
-    @Override
-    public void setShotResult(boolean hit, boolean sunk) {
+    protected void onShotResult(ShotCoordinate lastShot, boolean hit, boolean sunk) {
         if (lastShot == null) return;
 
         if (hit && sunk) {
-            handleSunkShip();
+            handleSunkShip(lastShot);
         } else if (hit) {
-            handleHit();
+            handleHit(lastShot);
         } else {
-            handleMiss();
+            handleMiss(lastShot);
         }
     }
 
-    private void handleSunkShip() {
-        if (!huntHits.contains(lastShot)) {
-            huntHits.add(lastShot);
+    private void handleSunkShip(ShotCoordinate shot) {
+        if (!huntHits.contains(shot)) {
+            huntHits.add(shot);
         }
-        List<ShotCoordinate> chain = findSunkChain(huntHits, lastShot);
+
+        List<ShotCoordinate> chain = findSunkChain(huntHits, shot);
         if (chain == null) {
-            chain = Collections.singletonList(lastShot);
+            chain = Collections.singletonList(shot);
         }
+
         int justSunkLen = chain.size();
         markBufferAround(chain);
         remainingShips.remove(Integer.valueOf(justSunkLen));
@@ -93,37 +79,36 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         consecutiveMisses = 0;
     }
 
-    private void handleHit() {
-        board[lastShot.y()][lastShot.x()] = CellState.HIT;
-        huntHits.add(lastShot);
+    private void handleHit(ShotCoordinate shot) {
+        board[shot.y()][shot.x()] = CellState.HIT;
+        huntHits.add(shot);
         enqueueBasedOnHits();
         consecutiveMisses = 0;
     }
 
-    private void handleMiss() {
-        board[lastShot.y()][lastShot.x()] = CellState.MISS;
+    private void handleMiss(ShotCoordinate shot) {
+        board[shot.y()][shot.x()] = CellState.MISS;
         consecutiveMisses++;
     }
 
     private ShotCoordinate computeHeatmapShot() {
         int[][] counts = new int[SIZE][SIZE];
 
-        for (int length : remainingShips) {
-            boolean includeVertical = (length > 1);
-            int shipWeight = length;
+        for (int shipWeight : remainingShips) {
+            boolean includeVertical = (shipWeight > 1);
 
             // Горизонтальные варианты
             for (int r = 0; r < SIZE; r++) {
-                for (int c = 0; c <= SIZE - length; c++) {
+                for (int c = 0; c <= SIZE - shipWeight; c++) {
                     boolean canPlace = true;
-                    for (int k = 0; k < length; k++) {
+                    for (int k = 0; k < shipWeight; k++) {
                         if (board[r][c + k] != CellState.EMPTY) {
                             canPlace = false;
                             break;
                         }
                     }
                     if (canPlace) {
-                        for (int k = 0; k < length; k++) {
+                        for (int k = 0; k < shipWeight; k++) {
                             counts[r][c + k] += shipWeight;
                         }
                     }
@@ -133,16 +118,16 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
             if (includeVertical) {
                 // Вертикальные варианты
                 for (int c = 0; c < SIZE; c++) {
-                    for (int r = 0; r <= SIZE - length; r++) {
+                    for (int r = 0; r <= SIZE - shipWeight; r++) {
                         boolean canPlace = true;
-                        for (int k = 0; k < length; k++) {
+                        for (int k = 0; k < shipWeight; k++) {
                             if (board[r + k][c] != CellState.EMPTY) {
                                 canPlace = false;
                                 break;
                             }
                         }
                         if (canPlace) {
-                            for (int k = 0; k < length; k++) {
+                            for (int k = 0; k < shipWeight; k++) {
                                 counts[r + k][c] += shipWeight;
                             }
                         }
@@ -191,7 +176,7 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
                 if (board[r][c] == CellState.EMPTY && counts[r][c] == maxCount) {
-                    candidates.add(new ShotCoordinate(c, r)); // Исправлено здесь
+                    candidates.add(ShotCoordinate.of(c, r));
                 }
             }
         }
@@ -201,8 +186,8 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     private ShotCoordinate findFirstEmptyCell() {
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
-                ShotCoordinate coordinate = new ShotCoordinate(c, r); // Исправлено здесь
-                if (board[r][c] == CellState.EMPTY && hasTried(coordinate)) {
+                ShotCoordinate coordinate = ShotCoordinate.of(c, r);
+                if (board[r][c] == CellState.EMPTY && isCellUntried(coordinate)) {
                     return coordinate;
                 }
             }
@@ -216,22 +201,22 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
 
         // Горизонтальная цепочка
         int left = c;
-        while (left > 0 && hits.contains(new ShotCoordinate(left - 1, r))) left--; // Исправлено здесь
+        while (left > 0 && hits.contains(ShotCoordinate.of(left - 1, r))) left--;
         int right = c;
-        while (right < SIZE - 1 && hits.contains(new ShotCoordinate(right + 1, r))) right++; // Исправлено здесь
+        while (right < SIZE - 1 && hits.contains(ShotCoordinate.of(right + 1, r))) right++;
         List<ShotCoordinate> horizontalChain = new ArrayList<>();
         for (int col = left; col <= right; col++) {
-            horizontalChain.add(new ShotCoordinate(col, r)); // Исправлено здесь
+            horizontalChain.add(ShotCoordinate.of(col, r));
         }
 
         // Вертикальная цепочка
         int up = r;
-        while (up > 0 && hits.contains(new ShotCoordinate(c, up - 1))) up--; // Исправлено здесь
+        while (up > 0 && hits.contains(ShotCoordinate.of(c, up - 1))) up--;
         int down = r;
-        while (down < SIZE - 1 && hits.contains(new ShotCoordinate(c, down + 1))) down++; // Исправлено здесь
+        while (down < SIZE - 1 && hits.contains(ShotCoordinate.of(c, down + 1))) down++;
         List<ShotCoordinate> verticalChain = new ArrayList<>();
         for (int row = up; row <= down; row++) {
-            verticalChain.add(new ShotCoordinate(c, row)); // Исправлено здесь
+            verticalChain.add(ShotCoordinate.of(c, row));
         }
 
         return horizontalChain.size() >= verticalChain.size() ? horizontalChain : verticalChain;
@@ -262,10 +247,9 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         }
     }
 
-    // Методы для доступа к состоянию
-    public int getConsecutiveMisses() {
-        return consecutiveMisses;
-    }
+    // ===============================================================================
+    // Методы для доступа к состоянию (для тестирования)
+    // ===============================================================================
 
     public List<Integer> getRemainingShips() {
         return new ArrayList<>(remainingShips);
