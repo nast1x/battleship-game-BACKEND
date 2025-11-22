@@ -182,11 +182,11 @@ public class DiagonalPlacer extends BasePlacementStrategy {
 
         // Проверяем, что ни один корабль не пересекает диагонали
         for (ShipPlacement placement : placements) {
-            boolean isHorizontal = !placement.isVertical();
+            boolean isHorizontal = !placement.vertical();
             if (wouldPlaceOnDiagonal(
-                    placement.getCol(),
-                    placement.getRow(),
-                    placement.getSize(),
+                    placement.col(),
+                    placement.row(),
+                    placement.size(),
                     isHorizontal
             )) {
                 return false;
@@ -227,7 +227,7 @@ public class DiagonalPlacer extends BasePlacementStrategy {
 
         // Статистика по ориентациям
         long horizontalShips = placements.stream()
-                .filter(p -> !p.isVertical())
+                .filter(p -> !p.vertical())
                 .count();
         System.out.println("Horizontal ships: " + horizontalShips);
         System.out.println("Vertical ships: " + (placements.size() - horizontalShips));

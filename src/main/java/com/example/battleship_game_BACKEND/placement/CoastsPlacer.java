@@ -192,7 +192,7 @@ public class CoastsPlacer extends BasePlacementStrategy {
         int verticalShips = 0;
 
         for (ShipPlacement placement : placements) {
-            boolean isHorizontal = !placement.isVertical();
+            boolean isHorizontal = !placement.vertical();
             boolean isCoastal = isShipOnCoast(placement);
 
             if (isCoastal) coastalShips++;
@@ -211,10 +211,10 @@ public class CoastsPlacer extends BasePlacementStrategy {
      * Проверяет, находится ли корабль полностью на границе
      */
     private boolean isShipOnCoast(ShipPlacement placement) {
-        boolean isHorizontal = !placement.isVertical();
-        int startX = placement.getCol();
-        int startY = placement.getRow();
-        int size = placement.getSize();
+        boolean isHorizontal = !placement.vertical();
+        int startX = placement.col();
+        int startY = placement.row();
+        int size = placement.size();
 
         if (isHorizontal) {
             // Горизонтальный корабль должен быть на верхней или нижней границе

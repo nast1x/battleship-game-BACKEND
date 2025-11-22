@@ -323,10 +323,10 @@ public abstract class BasePlacementStrategy {
         boolean[][] occupied = new boolean[BOARD_SIZE][BOARD_SIZE];
 
         for (ShipPlacement placement : placements) {
-            int size = placement.getSize();
-            boolean horizontal = !placement.isVertical(); // Конвертируем обратно
+            int size = placement.size();
+            boolean horizontal = !placement.vertical(); // Конвертируем обратно
 
-            if (!canPlace(occupied, placement.getCol(), placement.getRow(), size, horizontal)) {
+            if (!canPlace(occupied, placement.col(), placement.row(), size, horizontal)) {
                 return false;
             }
 
@@ -335,8 +335,8 @@ public abstract class BasePlacementStrategy {
             int dy = horizontal ? 0 : 1;
 
             for (int k = 0; k < size; k++) {
-                int x = placement.getCol() + dx * k;
-                int y = placement.getRow() + dy * k;
+                int x = placement.col() + dx * k;
+                int y = placement.row() + dy * k;
                 occupied[y][x] = true;
             }
         }

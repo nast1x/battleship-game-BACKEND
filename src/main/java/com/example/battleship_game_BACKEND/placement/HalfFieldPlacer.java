@@ -280,9 +280,9 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
     }
 
     private boolean isInPrimaryHalf(ShipPlacement placement) {
-        boolean isHorizontal = !placement.isVertical();
-        int startCol = placement.getCol();
-        int size = placement.getSize();
+        boolean isHorizontal = !placement.vertical();
+        int startCol = placement.col();
+        int size = placement.size();
         int endCol = startCol + (isHorizontal ? size - 1 : 0);
 
         if (useLeftHalf) {

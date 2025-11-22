@@ -67,12 +67,12 @@ public class PlacementStrategy {
 
         // Размещаем корабли в матрице
         for (ShipPlacement placement : placements) {
-            int dx = placement.isVertical() ? 0 : 1;
-            int dy = placement.isVertical() ? 1 : 0;
+            int dx = placement.vertical() ? 0 : 1;
+            int dy = placement.vertical() ? 1 : 0;
 
-            for (int k = 0; k < placement.getSize(); k++) {
-                int x = placement.getCol() + dx * k;
-                int y = placement.getRow() + dy * k;
+            for (int k = 0; k < placement.size(); k++) {
+                int x = placement.col() + dx * k;
+                int y = placement.row() + dy * k;
                 if (x < 10 && y < 10) {
                     // Используем символ, представляющий корабль
                     matrix[y][x] = 'S';
