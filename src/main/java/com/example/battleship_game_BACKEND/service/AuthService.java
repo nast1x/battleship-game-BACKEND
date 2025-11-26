@@ -30,28 +30,24 @@ public class AuthService {
                         loginRequest.getPassword()
                 )
         );
-
         SecurityContextHolder.getContext().setAuthentication(authentication);
         Player player = (Player) authentication.getPrincipal();
         String jwt = jwtTokenUtil.generateToken(player);
 
-        return new JwtResponse(jwt, "Bearer", player.getPlayerId(), player.getUsername());
+        return new JwtResponse(jwt, "Bearer", player.getPlayerId(), player.getNickname(), player.getAvatarUrl());
     }
 
     public JwtResponse registerUser(SignupRequest signUpRequest) {
         if (playerRepository.existsByNickname(signUpRequest.getNickname())) {
             throw new RuntimeException("Error: Nickname is already taken!");
         }
-
         Player player = new Player();
         player.setNickname(signUpRequest.getNickname());
         player.setPassword(passwordEncoder.encode(signUpRequest.getPassword())); // Хешируем пароль
         player.setAvatarUrl("avatar1.jpg");
-
         Player savedPlayer = playerRepository.save(player);
         String jwt = jwtTokenUtil.generateToken(savedPlayer);
-
-        return new JwtResponse(jwt, "Bearer", savedPlayer.getPlayerId(), savedPlayer.getUsername());
+        return new JwtResponse(jwt, "Bearer", savedPlayer.getPlayerId(), savedPlayer.getNickname(), savedPlayer.getAvatarUrl());
     }
 
     public void changePassword(Player player, String oldPassword, String newPassword) {

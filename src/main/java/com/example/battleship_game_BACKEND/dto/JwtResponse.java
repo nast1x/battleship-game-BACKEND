@@ -10,4 +10,5 @@ public class JwtResponse {
     private String type = "Bearer";
     private Long id;
     private String nickname;
+    private String avatarUrl;
 }

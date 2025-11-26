@@ -1,9 +1,11 @@
 package com.example.battleship_game_BACKEND.controller;
 
 import com.example.battleship_game_BACKEND.dto.AvatarUpdateRequest;
+import com.example.battleship_game_BACKEND.dto.PlayerMultiplayerDTO;
 import com.example.battleship_game_BACKEND.model.Player;
 import com.example.battleship_game_BACKEND.service.PlayerService;
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -19,6 +21,7 @@ public class PlayerController {
     private final PlayerService playerService;
 
     @PutMapping("/avatar")
+    @SneakyThrows
     public ResponseEntity<?> updateAvatar(
             @RequestBody AvatarUpdateRequest request,
             @AuthenticationPrincipal Player player) {
@@ -40,7 +43,6 @@ public class PlayerController {
         return ResponseEntity.ok(avatars);
     }
 
-    // PlayerController.java - добавьте этот метод
     @GetMapping("/current")
     public ResponseEntity<?> getCurrentPlayer(@AuthenticationPrincipal Player player) {
         try {
@@ -61,12 +63,17 @@ public class PlayerController {
 
     // нужен для получения всех игроков
     @GetMapping("/all")
-    public ResponseEntity<List<Player>> getAllPlayers() {
+    public ResponseEntity<List<PlayerMultiplayerDTO>> getAllPlayers() {
         try {
             System.out.println("Fetching all players");
             List<Player> players = playerService.getAllPlayers();
-            System.out.println("Returning " + players.size() + " players");
-            return ResponseEntity.ok(players);
+            List<PlayerMultiplayerDTO> playerSummaries = players.stream()
+                    .map(player -> new PlayerMultiplayerDTO( player.getPlayerId(), player.getNickname(), player.getAvatarUrl()))
+                    .toList();
+
+            System.out.println("Returning " + playerSummaries.size() + " player summaries");
+            return ResponseEntity.ok(playerSummaries);
+
         } catch (Exception e) {
             System.out.println("Error fetching players: " + e.getMessage());
             return ResponseEntity.status(500).body(Collections.emptyList());
