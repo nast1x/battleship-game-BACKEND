@@ -2,6 +2,7 @@ package com.example.battleship_game_BACKEND.controller;
 
 import com.example.battleship_game_BACKEND.dto.AvatarUpdateRequest;
 import com.example.battleship_game_BACKEND.dto.PlayerMultiplayerDTO;
+import com.example.battleship_game_BACKEND.dto.PlayerProfileDTO;
 import com.example.battleship_game_BACKEND.model.Player;
 import com.example.battleship_game_BACKEND.service.PlayerService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,8 @@ public class PlayerController {
 
     private final PlayerService playerService;
 
+
+    /** Обновление аватара у пользователя */
     @PutMapping("/avatar")
     @SneakyThrows
     public ResponseEntity<?> updateAvatar(
@@ -35,6 +38,7 @@ public class PlayerController {
         }
     }
 
+    /** Получение всех аватарок пользователей */
     @GetMapping("/avatars")
     public ResponseEntity<String[]> getAvailableAvatars() {
         System.out.println("Fetching available avatars");
@@ -43,8 +47,9 @@ public class PlayerController {
         return ResponseEntity.ok(avatars);
     }
 
+    /** Просмотр профиля пользователя */
     @GetMapping("/current")
-    public ResponseEntity<?> getCurrentPlayer(@AuthenticationPrincipal Player player) {
+    public ResponseEntity<PlayerProfileDTO> getCurrentPlayer(@AuthenticationPrincipal Player player) {
         try {
             System.out.println("Getting current player data for: " + player.getNickname());
 
@@ -52,16 +57,28 @@ public class PlayerController {
             Player currentPlayer = playerService.getPlayerByNickname(player.getNickname())
                     .orElseThrow(() -> new RuntimeException("Player not found"));
 
-            System.out.println("Found player: " + currentPlayer.getNickname() + ", avatar: " + currentPlayer.getAvatarUrl());
+            System.out.println("Found player: " + currentPlayer.getNickname() +
+                    ", avatar: " + currentPlayer.getAvatarUrl());
 
-            return ResponseEntity.ok(currentPlayer);
+            // Создаём DTO без пароля и других чувствительных данных
+            PlayerProfileDTO profile = new PlayerProfileDTO();
+            profile.setPlayerId(currentPlayer.getPlayerId());
+            profile.setNickname(currentPlayer.getNickname());
+            profile.setAvatarUrl(currentPlayer.getAvatarUrl());
+
+            // Если у тебя есть статистика — заполни её
+            // profile.setTotalGames(currentPlayer.getTotalGames());
+            // profile.setWins(currentPlayer.getWins());
+
+            return ResponseEntity.ok(profile);
+
         } catch (RuntimeException e) {
-            System.out.println("Error getting current player: " + e.getMessage());
-            return ResponseEntity.badRequest().body("Error getting player data: " + e.getMessage());
+            System.err.println("Error getting current player: " + e.getMessage());
+            return ResponseEntity.badRequest().build();
         }
     }
 
-    // нужен для получения всех игроков
+    /** Вывод всех игроков в мультиплеере*/
     @GetMapping("/all")
     public ResponseEntity<List<PlayerMultiplayerDTO>> getAllPlayers() {
         try {

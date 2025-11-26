@@ -22,6 +22,7 @@ import java.util.Map;
 public class AuthController {
     private final AuthService authService;
 
+    /** Запрос для авторизации */
     @PostMapping("/signin")
     public ResponseEntity<JwtResponse> authenticateUser(@RequestBody LoginRequest loginRequest) {
         System.out.println("Получен запрос на вход: " + loginRequest.getNickname());
@@ -35,6 +36,7 @@ public class AuthController {
         }
     }
 
+    /** Запрос для регистрации */
     @PostMapping("/signup")
     public ResponseEntity<JwtResponse> registerUser(@RequestBody SignupRequest signUpRequest) {
         System.out.println("Получен запрос на регистрацию: " + signUpRequest.getNickname());
@@ -53,7 +55,8 @@ public class AuthController {
         return ResponseEntity.ok().build();
     }
 
-    // ДОБАВЬТЕ ЭТОТ МЕТОД ДЛЯ СМЕНЫ ПАРОЛЯ
+
+    /** Смена пароля */
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest changePasswordRequest,
                                             @AuthenticationPrincipal Player player) {

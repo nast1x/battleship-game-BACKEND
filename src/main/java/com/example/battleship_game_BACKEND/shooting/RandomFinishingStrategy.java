@@ -98,7 +98,7 @@ public class RandomFinishingStrategy extends BaseShootingStrategy {
                     try {
                         ShotCoordinate neighbor = ShotCoordinate.of(cell.x() + dx, cell.y() + dy);
                         buffer.add(neighbor);
-                    } catch (IllegalArgumentException _) {
+                    } catch (IllegalArgumentException e) {
                         // Игнорируем невалидные координаты
                     }
                 }
