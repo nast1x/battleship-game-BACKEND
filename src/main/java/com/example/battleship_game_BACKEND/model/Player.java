@@ -26,6 +26,9 @@ public class Player implements UserDetails {
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
+    @Column(name = "status", nullable = false)
+    private Boolean status;
+
     // Константы для предустановленных аватаров
     public static final String[] DEFAULT_AVATARS = {
             "avatar1.jpg", "avatar2.jpg", "avatar3.jpg", "avatar4.jpg", "avatar5.jpg",

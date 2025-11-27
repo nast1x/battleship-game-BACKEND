@@ -83,7 +83,7 @@ public class PlayerController {
     public ResponseEntity<List<PlayerMultiplayerDTO>> getAllPlayers() {
         try {
             System.out.println("Fetching all players");
-            List<Player> players = playerService.getAllPlayers();
+            List<Player> players = playerService.getOnlinePlayers();
             List<PlayerMultiplayerDTO> playerSummaries = players.stream()
                     .map(player -> new PlayerMultiplayerDTO( player.getPlayerId(), player.getNickname(), player.getAvatarUrl()))
                     .toList();

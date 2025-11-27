@@ -5,11 +5,18 @@ import com.example.battleship_game_BACKEND.dto.JwtResponse;
 import com.example.battleship_game_BACKEND.dto.LoginRequest;
 import com.example.battleship_game_BACKEND.dto.SignupRequest;
 import com.example.battleship_game_BACKEND.model.Player;
+import com.example.battleship_game_BACKEND.repository.PlayerRepository;
+import com.example.battleship_game_BACKEND.security.JwtTokenUtil;
 import com.example.battleship_game_BACKEND.service.AuthService;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -21,18 +28,41 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenUtil jwtTokenUtil;
+    private final PlayerRepository playerRepository;
 
     /** Запрос для авторизации */
     @PostMapping("/signin")
-    public ResponseEntity<JwtResponse> authenticateUser(@RequestBody LoginRequest loginRequest) {
-        System.out.println("Получен запрос на вход: " + loginRequest.getNickname());
+    public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
         try {
-            JwtResponse jwtResponse = authService.authenticateUser(loginRequest);
-            System.out.println("Успешный вход для: " + loginRequest.getNickname());
-            return ResponseEntity.ok(jwtResponse);
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getNickname(),
+                            loginRequest.getPassword()
+                    )
+            );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            Player player = (Player) authentication.getPrincipal();
+            Player playerToUpdate = playerRepository.findByNickname(player.getNickname())
+                    .orElseThrow(() -> new RuntimeException("Player not found after auth"));
+
+            playerToUpdate.setStatus(true);
+            playerRepository.save(playerToUpdate);
+
+            String jwt = jwtTokenUtil.generateToken(player);
+            JwtResponse response = new JwtResponse(
+                    jwt, "Bearer",
+                    player.getPlayerId(),
+                    player.getNickname(),
+                    player.getAvatarUrl() != null ? player.getAvatarUrl() : Player.DEFAULT_AVATAR
+            );
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            System.out.println("Ошибка входа: " + e.getMessage());
-            return ResponseEntity.status(401).build();
+            System.err.println("Ошибка входа: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Неверный логин или пароль"));
         }
     }
 
@@ -48,6 +78,16 @@ public class AuthController {
             System.out.println("Ошибка регистрации: " + e.getMessage());
             return ResponseEntity.badRequest().build();
         }
+    }
+
+    /** Запрос для выхода из системы*/
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@AuthenticationPrincipal Player player) {
+        if (player != null) {
+            player.setStatus(false);
+            playerRepository.save(player);
+        }
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/me")

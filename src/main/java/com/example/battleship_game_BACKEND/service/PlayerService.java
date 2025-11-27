@@ -62,4 +62,8 @@ public class PlayerService {
     public Player save(Player player) {
         return playerRepository.save(player);
     }
+
+    public List<Player> getOnlinePlayers() {
+        return playerRepository.findByStatus(true); // ← JPA-метод
+    }
 }
