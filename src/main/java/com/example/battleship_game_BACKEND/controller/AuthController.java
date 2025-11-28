@@ -17,6 +17,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -31,6 +32,7 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenUtil jwtTokenUtil;
     private final PlayerRepository playerRepository;
+    private final PasswordEncoder passwordEncoder;
 
     /** Запрос для авторизации */
     @PostMapping("/signin")
@@ -68,15 +70,32 @@ public class AuthController {
 
     /** Запрос для регистрации */
     @PostMapping("/signup")
-    public ResponseEntity<JwtResponse> registerUser(@RequestBody SignupRequest signUpRequest) {
-        System.out.println("Получен запрос на регистрацию: " + signUpRequest.getNickname());
+    public ResponseEntity<?> registerUser(@RequestBody SignupRequest signUpRequest) {
         try {
-            JwtResponse jwtResponse = authService.registerUser(signUpRequest);
+            System.out.println("Получен запрос на регистрацию: " + signUpRequest.getNickname());
+            if (playerRepository.existsByNickname(signUpRequest.getNickname())) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Игрок с таким никнеймом уже существует"));
+            }
+            Player player = new Player();
+            player.setNickname(signUpRequest.getNickname());
+            player.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
+            player.setAvatarUrl(Player.DEFAULT_AVATAR);
+            player.setStatus(true);
+            Player savedPlayer = playerRepository.save(player);
+            String jwt = jwtTokenUtil.generateToken(savedPlayer);
+            JwtResponse response = new JwtResponse(
+                    jwt, "Bearer",
+                    savedPlayer.getPlayerId(),
+                    savedPlayer.getNickname(),
+                    savedPlayer.getAvatarUrl() != null ? savedPlayer.getAvatarUrl() : Player.DEFAULT_AVATAR
+            );
             System.out.println("Успешная регистрация для: " + signUpRequest.getNickname());
-            return ResponseEntity.ok(jwtResponse);
-        } catch (RuntimeException e) {
-            System.out.println("Ошибка регистрации: " + e.getMessage());
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.err.println("Ошибка регистрации: " + e.getMessage());
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Ошибка при регистрации: " + e.getMessage()));
         }
     }
 
