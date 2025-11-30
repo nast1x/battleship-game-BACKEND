@@ -44,7 +44,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource)) // Включаем CORS с конфигурацией
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ← Используем CORS
+                //.cors(cors -> cors.configurationSource(corsConfigurationSource())) // ← Используем CORS
                 .csrf(csrf -> csrf.disable())
                 .exceptionHandling(exceptionHandling ->
                         exceptionHandling.authenticationEntryPoint(jwtAuthenticationEntryPoint))
@@ -54,7 +54,8 @@ public class SecurityConfig {
                         authorizeRequests
                                 .requestMatchers("/api/auth/**").permitAll()
                                 .requestMatchers("/api/players/**").permitAll()
-                                .requestMatchers("/api/players/all").permitAll() // нужно для /api/players/all
+                                .requestMatchers("/ws/**").permitAll()
+                                .requestMatchers("/api/players/all").permitAll()
                                 .requestMatchers("/api/players/current").authenticated()
                                 .requestMatchers("/api/auth/change-password").authenticated()
                                 .anyRequest().authenticated()
@@ -64,7 +65,7 @@ public class SecurityConfig {
 
         return http.build();
     }
-
+/*
     // Встроенный CORS
     private CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -76,5 +77,5 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
-    }
+    }*/
 }

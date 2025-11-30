@@ -23,7 +23,7 @@ public class PlacementController {
         try {
             PlacementResponse response = placementService.generatePlacement(request);
             return ResponseEntity.ok(response);
-        } catch (Exception _) {
+        } catch (Exception e) {
             return ResponseEntity.badRequest().build();
         }
     }

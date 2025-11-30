@@ -16,9 +16,11 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Разрешаем все origin'ы (любое устройство в сети)
-        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
 
+        // Разрешаем все origin'ы (любое устройство в сети)
+        //configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+        configuration.setAllowedOrigins(List.of("http://192.168.0.103:4201"));
+        configuration.setAllowCredentials(true);
         // Разрешаем все методы
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
