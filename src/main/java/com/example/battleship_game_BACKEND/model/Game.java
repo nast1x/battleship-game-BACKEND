@@ -42,6 +42,7 @@ public class Game {
     @Column(name = "game_status", nullable = false)
     private GameStatus gameStatus = GameStatus.WAITING;
 
+
     @Enumerated(EnumType.STRING)
     @Column(name = "game_type", nullable = false)
     private GameType gameType;
