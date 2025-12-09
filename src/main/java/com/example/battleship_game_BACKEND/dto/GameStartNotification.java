@@ -8,4 +8,5 @@ public class GameStartNotification {
     private Long opponentId;
     private String opponentNickname;
     private String opponentAvatarUrl;
+    private Long currentTurnPlayerId;
 }

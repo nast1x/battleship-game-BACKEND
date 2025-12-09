@@ -13,7 +13,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
                 // ВАЖНО: origin фронтенда
-                .setAllowedOriginPatterns("http://192.168.0.103:4201")
+                .setAllowedOriginPatterns("*")
                 // или для отладки:
                 // .setAllowedOriginPatterns("*")
                 .withSockJS();
