@@ -27,7 +27,7 @@ public class GameService {
     private boolean isPlayerTurn = true;
     private boolean isBattleOver = false;
     private Difficulty difficulty = Difficulty.EASY;
-    private ShootingStrategy shootingStrategy;
+    private BaseShootingStrategy shootingStrategy;
 
     // Корабли игроков
     private List<ShipPlacement> playerShips = new ArrayList<>();

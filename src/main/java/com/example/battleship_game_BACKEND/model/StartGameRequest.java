@@ -8,7 +8,6 @@ import java.util.List;
 @Setter
 @Getter
 public class StartGameRequest {
-    // Геттеры и сеттеры
     private List<ShipPlacement> playerShips;
     private List<ShipPlacement> computerShips;
     private Difficulty difficulty;

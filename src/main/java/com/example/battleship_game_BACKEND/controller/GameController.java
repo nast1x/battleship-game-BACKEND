@@ -2,7 +2,6 @@ package com.example.battleship_game_BACKEND.controller;
 
 import com.example.battleship_game_BACKEND.model.*;
 import com.example.battleship_game_BACKEND.service.GameService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,8 +12,11 @@ import java.util.Map;
 @CrossOrigin(origins = "*")
 public class GameController {
 
-    @Autowired
-    private GameService gameService;
+    private final GameService gameService;
+
+    public GameController(GameService gameService) {
+        this.gameService = gameService;
+    }
 
     @PostMapping("/start")
     public ResponseEntity<GameStatus> startGame(@RequestBody StartGameRequest request) {
