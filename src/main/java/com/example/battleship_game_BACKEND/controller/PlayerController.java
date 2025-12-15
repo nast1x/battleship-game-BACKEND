@@ -20,8 +20,6 @@ import java.util.List;
 public class PlayerController {
 
     private final PlayerService playerService;
-
-
     /** Обновление аватара у пользователя */
     @PutMapping("/avatar")
     @SneakyThrows

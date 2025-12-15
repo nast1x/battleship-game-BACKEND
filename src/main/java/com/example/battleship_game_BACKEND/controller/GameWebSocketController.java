@@ -44,6 +44,7 @@ public class GameWebSocketController {
                 "/queue/invitations/" + opponent.getPlayerId(),
                 response
         );
+
     }
 
     /**

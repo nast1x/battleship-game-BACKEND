@@ -1,0 +1,10 @@
+.gradle
+build
+gradle/wrapper/dists
+*.log
+.git
+.idea
+*.iml
+out
+target
+.DS_Store

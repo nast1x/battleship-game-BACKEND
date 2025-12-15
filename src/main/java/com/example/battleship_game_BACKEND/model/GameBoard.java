@@ -12,11 +12,12 @@ public class GameBoard {
     @Column(name = "game_board_id")
     private Long gameBoardId;
 
-    // Изменяем на строковое представление матрицы
     @Column(name = "placement_matrix", nullable = false, columnDefinition = "TEXT")
     private String placementMatrix;
 
-    // Методы для преобразования между String и Character[][]
+    @Column(name = "game_state_json", columnDefinition = "TEXT")
+    private String gameStateJson;
+
     public Character[][] getPlacementMatrixAsArray() {
         if (placementMatrix == null || placementMatrix.isEmpty()) {
             return new Character[10][10];
@@ -29,7 +30,11 @@ public class GameBoard {
             String[] cols = rows[i].split(",");
             matrix[i] = new Character[cols.length];
             for (int j = 0; j < cols.length; j++) {
-                matrix[i][j] = cols[j].charAt(0);
+                if (!cols[j].trim().isEmpty()) {
+                    matrix[i][j] = cols[j].charAt(0);
+                } else {
+                    matrix[i][j] = ' ';
+                }
             }
         }
         return matrix;

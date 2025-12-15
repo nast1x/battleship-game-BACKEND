@@ -3,7 +3,6 @@ plugins {
     id 'org.springframework.boot' version '3.5.7'
     id 'io.spring.dependency-management' version '1.1.7'
 }
-
 group = 'com.example'
 version = '0.0.1-SNAPSHOT'
 description = 'battleship-game-BACKEND'
@@ -51,8 +50,21 @@ dependencies {
     implementation("org.mapstruct:mapstruct:1.5.5.Final")
     annotationProcessor("org.mapstruct:mapstruct-processor:1.5.5.Final")
     annotationProcessor("org.projectlombok:lombok-mapstruct-binding:0.2.0")
+
 }
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+// Для создания jar с зависимостями
+bootJar {
+    archiveFileName = 'app.jar'
+    launchScript()
+}
+
+// Для Docker слоев
+bootJar {
+    layered {
+        enabled = true
+    }
 }

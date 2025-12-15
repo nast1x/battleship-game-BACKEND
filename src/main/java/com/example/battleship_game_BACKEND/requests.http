@@ -1,0 +1,30 @@
+#### Запрос 1: Создать игру
+POST http://localhost:8080/api/computer-game/start?playerId=1
+Content-Type: application/json
+
+{
+  "placementStrategy": "RANDOM",
+  "playerShips": [
+    {"shipId": 1, "size": 4, "row": 0, "col": 0, "vertical": false},
+    {"shipId": 2, "size": 3, "row": 2, "col": 2, "vertical": true},
+    {"shipId": 3, "size": 3, "row": 4, "col": 4, "vertical": false}
+  ]
+}
+
+### Запрос 2: Проверить все игры
+###GET http://localhost:8080/api/computer-game/debug/games
+
+### Запрос 3: Проверить конкретную игру (ID будет установлен динамически)
+###GET http://localhost:8080/api/computer-game/{{gameId}}/state
+
+# 1. Проверьте доступность эндпоинта
+#curl -v -X GET "http://localhost:8080/api/computer-game/debug/games"
+
+## 2. Проверьте CORS
+#curl -v -X OPTIONS "http://localhost:8080/api/computer-game/debug/games" \
+#  -H "Origin: http://localhost:4200" \
+#  -H "Access-Control-Request-Method: GET"
+#
+## 3. Проверьте разные методы
+#curl -X POST "http://localhost:8080/api/test/force-create-game" \
+#  -H "Content-Type: application/json"

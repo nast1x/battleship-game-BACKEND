@@ -3,7 +3,7 @@ package com.example.battleship_game_BACKEND.shooting;
 /**
  * Record для представления координат выстрела (Java 16+)
  */
-interface ShootingStrategy {
+public interface ShootingStrategy {
 
     /**
      * Возвращает координаты следующего выстрела в диапазоне 0-9.
