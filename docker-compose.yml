@@ -23,7 +23,7 @@ services:
       context: ../battlershipF
       dockerfile: Dockerfile
     ports:
-      - "80:80"
+      - "8081:80"
     depends_on:
       - battleship-backend
     networks:
