@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -91,7 +93,7 @@ public class GameLogicService {
 
             if (isSunk) {
                 result.put("message", "Корабль потоплен!");
-
+                markSurroundingAsMiss(opponentField, playerHits, row, col);
                 // Обновляем количество оставшихся кораблей
                 int shipsLeft = countShipsLeft(opponentField, playerHits);
                 if (isPlayer1) {
@@ -225,10 +227,11 @@ public class GameLogicService {
 
             if (state.getPlayer1ShipsLeft() == 0 && state.getPlayer2ShipsLeft() == 0) {
                 game.setResult("DRAW");
+                game.setResult(null); // В случае ничьей победителя нет
             } else if (state.getPlayer1ShipsLeft() == 0) {
-                game.setResult("PLAYER2_WINS");
+                game.setResult(game.getPlayer2().getPlayerId().toString());
             } else {
-                game.setResult("PLAYER1_WINS");
+                game.setResult(game.getPlayer1().getPlayerId().toString());
             }
 
             gameRepository.save(game);
@@ -329,5 +332,64 @@ public class GameLogicService {
         } catch (Exception e) {
             System.err.println("Ошибка при отправке состояния игроку " + playerId + ": " + e.getMessage());
         }
+    }
+    /**
+     * Помечает клетки вокруг уничтоженного корабля как "Промах" (M)
+     */
+    private void markSurroundingAsMiss(Character[][] ships, Character[][] hits, int startRow, int startCol) {
+        // 1. Находим все части этого корабля
+        List<int[]> shipParts = findShipParts(ships, startRow, startCol);
+
+        // 2. Проходим по каждой части корабля
+        for (int[] part : shipParts) {
+            int r = part[0];
+            int c = part[1];
+
+            // 3. Для каждой части проверяем соседей (квадрат 3x3)
+            for (int i = r - 1; i <= r + 1; i++) {
+                for (int j = c - 1; j <= c + 1; j++) {
+                    if (i >= 0 && i < 10 && j >= 0 && j < 10) {
+                        if (hits[i][j] != 'H') {
+                            hits[i][j] = 'M';
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Находит все координаты корабля, зная одну его точку
+     */
+    private List<int[]> findShipParts(Character[][] ships, int row, int col) {
+        List<int[]> parts = new ArrayList<>();
+        // Добавляем точку, в которую попали
+        parts.add(new int[]{row, col});
+        // Ищем вверх
+        int r = row - 1;
+        while (r >= 0 && ships[r][col] == 'S') {
+            parts.add(new int[]{r, col});
+            r--;
+        }
+        // Ищем вниз
+        r = row + 1;
+        while (r < 10 && ships[r][col] == 'S') {
+            parts.add(new int[]{r, col});
+            r++;
+        }
+        // Ищем влево
+        int c = col - 1;
+        while (c >= 0 && ships[row][c] == 'S') {
+            parts.add(new int[]{row, c});
+            c--;
+        }
+        // Ищем вправо
+        c = col + 1;
+        while (c < 10 && ships[row][c] == 'S') {
+            parts.add(new int[]{row, c});
+            c++;
+        }
+
+        return parts;
     }
 }

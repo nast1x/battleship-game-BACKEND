@@ -51,29 +51,10 @@ public class PlayerController {
     @GetMapping("/current")
     public ResponseEntity<PlayerProfileDTO> getCurrentPlayer(@AuthenticationPrincipal Player player) {
         try {
-            System.out.println("Getting current player data for: " + player.getNickname());
-
-            // Загружаем актуальные данные из базы
-            Player currentPlayer = playerService.getPlayerByNickname(player.getNickname())
-                    .orElseThrow(() -> new RuntimeException("Player not found"));
-
-            System.out.println("Found player: " + currentPlayer.getNickname() +
-                    ", avatar: " + currentPlayer.getAvatarUrl());
-
-            // Создаём DTO без пароля и других чувствительных данных
-            PlayerProfileDTO profile = new PlayerProfileDTO();
-            profile.setPlayerId(currentPlayer.getPlayerId());
-            profile.setNickname(currentPlayer.getNickname());
-            profile.setAvatarUrl(currentPlayer.getAvatarUrl());
-
-            // Если у тебя есть статистика — заполни её
-            // profile.setTotalGames(currentPlayer.getTotalGames());
-            // profile.setWins(currentPlayer.getWins());
-
+            // Просто вызываем сервис, который теперь умеет считать статистику
+            PlayerProfileDTO profile = playerService.getPlayerProfileWithStats(player);
             return ResponseEntity.ok(profile);
-
         } catch (RuntimeException e) {
-            System.err.println("Error getting current player: " + e.getMessage());
             return ResponseEntity.badRequest().build();
         }
     }

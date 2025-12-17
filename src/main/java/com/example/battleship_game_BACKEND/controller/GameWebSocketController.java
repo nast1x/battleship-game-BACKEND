@@ -385,17 +385,26 @@
         private void sendGameEndNotification(Game game) {
             Map<String, Object> endNotification = new HashMap<>();
             endNotification.put("gameId", game.getGameId());
-            endNotification.put("result", game.getResult());
+            endNotification.put("result", game.getResult()); // Здесь лежит либо ID, либо "DRAW"
+            endNotification.put("action", "GAME_ENDED");
 
-            // Определяем победителя
-            if ("PLAYER1_WINS".equals(game.getResult())) {
-                endNotification.put("winnerId", game.getPlayer1().getPlayerId());
-            } else if ("PLAYER2_WINS".equals(game.getResult())) {
-                endNotification.put("winnerId", game.getPlayer2().getPlayerId());
-            } else {
+            // Новая логика определения победителя на основе ID
+            if ("DRAW".equals(game.getResult())) {
                 endNotification.put("draw", true);
+                endNotification.put("winnerId", null);
+            } else {
+                endNotification.put("draw", false);
+                try {
+                    // Если в result лежит ID, парсим его и отправляем как winnerId
+                    Long winnerId = Long.parseLong(game.getResult());
+                    endNotification.put("winnerId", winnerId);
+                } catch (NumberFormatException e) {
+                    // На всякий случай, если там оказался старый текст или null
+                    endNotification.put("winnerId", null);
+                }
             }
 
+            // Отправляем обоим игрокам
             messagingTemplate.convertAndSend(
                     "/queue/game.end/" + game.getPlayer1().getPlayerId(),
                     endNotification
@@ -445,21 +454,15 @@
             }
         }
 
-        private void handleSurrender(Game game, Long playerId) {
+        private void handleSurrender(Game game, Long surrenderingPlayerId) {
+            Long winnerId = getOpponentId(game, surrenderingPlayerId);
+
             game.setGameStatus(GameStatus.COMPLETED);
             game.setEndDate(LocalDateTime.now());
-
-            if (game.getPlayer1().getPlayerId().equals(playerId)) {
-                game.setResult("PLAYER2_WINS_SURRENDER");
-            } else {
-                game.setResult("PLAYER1_WINS_SURRENDER");
-            }
+            game.setResult(winnerId.toString()); // Записываем ID того, кто НЕ сдался
 
             gameRepository.save(game);
-
-            // Удаляем состояние из памяти
             inMemoryGameStateService.removeGameState(game.getGameId());
-
             sendGameEndNotification(game);
         }
 
