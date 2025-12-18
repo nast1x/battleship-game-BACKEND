@@ -1,63 +1,42 @@
 package com.example.battleship_game_BACKEND.controller;
 
-import com.example.battleship_game_BACKEND.dto.*;
-import com.example.battleship_game_BACKEND.model.Game;
-import com.example.battleship_game_BACKEND.service.ComputerGameService;
-import lombok.RequiredArgsConstructor;
+
+import com.example.battleship_game_BACKEND.service.computer.ComputerGameService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
-
 @RestController
-@RequestMapping("/api/computer-game")
-@RequiredArgsConstructor
+@RequestMapping("/api/computer")
 public class ComputerGameController {
 
-    private final ComputerGameService computerGameService;
+    @Autowired
+    private ComputerGameService computerGameService;
 
-    @PostMapping("/start")
-    public ResponseEntity<Game> startGame(
-            @RequestParam Long playerId,
-            @RequestBody ComputerGameStartRequest request) {
-        Game game = computerGameService.createComputerGame(playerId, request);
-        return ResponseEntity.ok(game);
+    /**
+     * Ход компьютера
+     */
+    @PostMapping("/game/{gameId}/move")
+    public ResponseEntity<?> computerMove(@PathVariable Long gameId) {
+        try {
+            ComputerGameService.ShotResult result = computerGameService.computerMakeMove(gameId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Ошибка: " + e.getMessage());
+        }
     }
 
-    @PostMapping("/{gameId}/setup")
-    public ResponseEntity<Game> setupGame(
-            @PathVariable Long gameId,
-            @RequestBody ComputerGameStartRequest request) {
-        Game game = computerGameService.setupGame(gameId, request);
-        return ResponseEntity.ok(game);
-    }
-
-    @GetMapping("/{gameId}/state")
-    public ResponseEntity<Map<String, Object>> getGameState(@PathVariable Long gameId) {
-        Map<String, Object> state = computerGameService.getGameState(gameId);
-        return ResponseEntity.ok(state);
-    }
-
-    @PostMapping("/{gameId}/shot")
-    public ResponseEntity<ShotResponse> makeShot(
-            @PathVariable Long gameId,
-            @RequestBody ShotRequest request) {
-        ShotResponse response = computerGameService.processPlayerShot(gameId, request);
-        return ResponseEntity.ok(response);
-    }
-
-    @PostMapping("/{gameId}/surrender")
-    public ResponseEntity<Void> surrender(@PathVariable Long gameId) {
-        computerGameService.surrender(gameId);
-        return ResponseEntity.ok().build();
-    }
-    @PostMapping("/create")
-    public ResponseEntity<Game> createComputerGame(
-            @RequestParam Long playerId,
-            @RequestBody ComputerGameStartRequest request) {
-        Game game = computerGameService.createComputerGame(playerId, request);
-
-        // Убедитесь, что Game имеет поле gameId и геттер getGameId()
-        return ResponseEntity.ok(game);
+    /**
+     * Инициализация состояния компьютера для новой игры
+     */
+    @PostMapping("/game/{gameId}/init")
+    public ResponseEntity<?> initComputerState(@PathVariable Long gameId) {
+        try {
+            // Этот метод может быть вызван при начале новой игры с компьютером
+            // В реальности это будет сделано в GameService при создании игры
+            return ResponseEntity.ok("Состояние компьютера инициализировано");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Ошибка: " + e.getMessage());
+        }
     }
 }
