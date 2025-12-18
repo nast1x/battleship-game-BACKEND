@@ -1,6 +1,6 @@
 package com.example.battleship_game_BACKEND.placement;
 
-import com.example.battleship_game_BACKEND.model.ShipPlacement;
+import com.example.battleship_game_BACKEND.model.PlacementStrategy;
 import com.example.battleship_game_BACKEND.repository.PlacementStrategyRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -12,7 +12,7 @@ import java.util.*;
  * столбцы 0 или 9 для вертикали).
  * Синхронизирован с BasePlacementStrategy.
  */
-@Component
+//@Component
 public class CoastsPlacer extends BasePlacementStrategy {
 
     // ===============================================================================
@@ -174,8 +174,9 @@ public class CoastsPlacer extends BasePlacementStrategy {
     private boolean getPreferredOrientation(int x, int y) {
         if (y == 0 || y == BOARD_SIZE - 1) {
             return true; // Горизонтальная для верхней/нижней границы
-        } else return x != 0 && x != BOARD_SIZE - 1; // Вертикальная для левой/правой границы
-// По умолчанию горизонтальная
+        } else {
+            return false; // Вертикальная для левой/правой границы
+        }
     }
 
     // ===============================================================================
@@ -185,13 +186,13 @@ public class CoastsPlacer extends BasePlacementStrategy {
     /**
      * Для тестирования: возвращает статистику по размещенным кораблям
      */
-    public Map<String, Integer> getPlacementStatistics(List<ShipPlacement> placements) {
+    public Map<String, Integer> getPlacementStatistics(List<PlacementStrategy.ShipPlacement> placements) {
         Map<String, Integer> stats = new HashMap<>();
         int coastalShips = 0;
         int horizontalShips = 0;
         int verticalShips = 0;
 
-        for (ShipPlacement placement : placements) {
+        for (PlacementStrategy.ShipPlacement placement : placements) {
             boolean isHorizontal = !placement.vertical();
             boolean isCoastal = isShipOnCoast(placement);
 
@@ -210,7 +211,7 @@ public class CoastsPlacer extends BasePlacementStrategy {
     /**
      * Проверяет, находится ли корабль полностью на границе
      */
-    private boolean isShipOnCoast(ShipPlacement placement) {
+    private boolean isShipOnCoast(PlacementStrategy.ShipPlacement placement) {
         boolean isHorizontal = !placement.vertical();
         int startX = placement.col();
         int startY = placement.row();
@@ -228,13 +229,13 @@ public class CoastsPlacer extends BasePlacementStrategy {
     /**
      * Валидация специфичная для береговой стратегии
      */
-    public boolean validateCoastalPlacement(List<ShipPlacement> placements) {
+    public boolean validateCoastalPlacement(List<PlacementStrategy.ShipPlacement> placements) {
         if (!isValidPlacement(placements)) {
             return false;
         }
 
         // Проверяем, что все корабли размещены по правилам береговой стратегии
-        for (ShipPlacement placement : placements) {
+        for (PlacementStrategy.ShipPlacement placement : placements) {
             if (!isShipOnCoast(placement)) {
                 return false;
             }

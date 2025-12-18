@@ -1,6 +1,7 @@
 package com.example.battleship_game_BACKEND.shooting;
 
-import lombok.Getter;
+import com.example.battleship_game_BACKEND.service.ShotCoordinate;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 
@@ -8,6 +9,7 @@ import java.util.*;
  * Стратегия «Сложный» с анализом плотности (Heatmap) и адаптивными коррекциями.
  * Синхронизирована с BaseShootingStrategy.
  */
+//@Component
 public class DensityAnalysisStrategy extends BaseShootingStrategy {
 
     private static final int EDGE_BONUS_THRESHOLD = 8;
@@ -22,7 +24,6 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     private final List<Integer> remainingShips = new ArrayList<>(INITIAL_SHIPS);
 
     /** Счётчик подряд промахов. */
-    @Getter
     private int consecutiveMisses = 0;
 
     private final Random random = new Random();
@@ -30,24 +31,17 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     public DensityAnalysisStrategy() {
         // Инициализация поля
         for (int i = 0; i < SIZE; i++) {
-            for (int j = 0; j < SIZE; j++) {
-                board[i][j] = CellState.EMPTY;
-            }
+            Arrays.fill(board[i], CellState.EMPTY);
         }
     }
 
-    // ===============================================================================
-    // Основная логика выстрела (СИНХРОНИЗИРОВАНА)
-    // ===============================================================================
-
     @Override
-    protected ShotCoordinate computeNextShot() {
+    public ShotCoordinate getNextShot() {
         // Синхронизация: обновляем board на основе tried[][]
         syncBoardWithTried();
 
         // ——— 1) Hunt-режим (добивание) ———
-        ShotCoordinate huntShot = getShotFromHuntQueue(this::isCellAvailable
-        );
+        ShotCoordinate huntShot = getShotFromHuntQueue(this::isCellAvailable);
         if (huntShot != null) {
             return huntShot;
         }
@@ -57,20 +51,24 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     }
 
     @Override
-    protected void onShotResult(ShotCoordinate lastShot, boolean hit, boolean sunk) {
-        if (lastShot == null) return;
+    public void recordShot(ShotCoordinate shot, boolean hit, boolean sunk) {
+        // Отмечаем клетку как обстрелянную
+        tried[shot.x()][shot.y()] = true;
 
-        // Синхронизация: сначала обновляем board
-        updateBoardState(lastShot, hit, sunk);
-
-        // Затем обрабатываем логику
-        if (hit && sunk) {
-            handleSunkShip(lastShot);
+        // Обновляем состояние доски
+        if (sunk) {
+            board[shot.y()][shot.x()] = CellState.SUNK;
+            handleSunkShip(shot);
         } else if (hit) {
-            handleHit(lastShot);
+            board[shot.y()][shot.x()] = CellState.HIT;
+            handleHit(shot);
         } else {
-            handleMiss(lastShot);
+            board[shot.y()][shot.x()] = CellState.MISS;
+            handleMiss(shot);
         }
+
+        // Синхронизируем состояния
+        syncBoardWithTried();
     }
 
     // ===============================================================================
@@ -83,9 +81,8 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     private void syncBoardWithTried() {
         for (int row = 0; row < SIZE; row++) {
             for (int col = 0; col < SIZE; col++) {
-                if (isCellTried(row, col) && board[row][col] == CellState.EMPTY) {
-                    // Если клетка обстреляна в базовом классе, но у нас помечена как EMPTY,
-                    // значит это промах (т.к. попадания обрабатываются в onShotResult)
+                // Если клетка обстреляна и не помечена в board, отмечаем как промах
+                if (tried[col][row] && board[row][col] == CellState.EMPTY) {
                     board[row][col] = CellState.MISS;
                 }
             }
@@ -93,27 +90,14 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     }
 
     /**
-     * Обновляет состояние board на основе результата выстрела
-     */
-    private void updateBoardState(ShotCoordinate shot, boolean hit, boolean sunk) {
-        if (sunk) {
-            board[shot.y()][shot.x()] = CellState.SUNK;
-        } else if (hit) {
-            board[shot.y()][shot.x()] = CellState.HIT;
-        } else {
-            board[shot.y()][shot.x()] = CellState.MISS;
-        }
-    }
-
-    /**
-     * Проверяет, доступна ли клетка для выстрела (синхронизированная проверка)
+     * Проверяет, доступна ли клетка для выстрела
      */
     private boolean isCellAvailable(ShotCoordinate cell) {
-        return board[cell.y()][cell.x()] == CellState.EMPTY && isCellUntried(cell);
+        return board[cell.y()][cell.x()] == CellState.EMPTY && !tried[cell.x()][cell.y()];
     }
 
     // ===============================================================================
-    // Обработка результатов выстрела (СИНХРОНИЗИРОВАНА)
+    // Обработка результатов выстрела
     // ===============================================================================
 
     private void handleSunkShip(ShotCoordinate shot) {
@@ -130,14 +114,12 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         markBufferAround(chain);
         remainingShips.remove(Integer.valueOf(justSunkLen));
 
-        // Используем базовый метод для сброса hunt-режима
         resetHuntMode();
         consecutiveMisses = 0;
     }
 
     private void handleHit(ShotCoordinate shot) {
         huntHits.add(shot);
-        // Используем базовый метод для построения очереди добивания
         enqueueBasedOnHits();
         consecutiveMisses = 0;
     }
@@ -147,7 +129,7 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     }
 
     // ===============================================================================
-    // Heatmap логика (СИНХРОНИЗИРОВАНА)
+    // Heatmap логика
     // ===============================================================================
 
     private ShotCoordinate computeHeatmapShot() {
@@ -164,7 +146,7 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
             return candidates.get(random.nextInt(candidates.size()));
         }
 
-        return findFirstEmptyCell();
+        return findAnyUntriedCell();
     }
 
     private int[][] buildProbabilityHeatmap() {
@@ -221,10 +203,15 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
 
     private void applyEdgeBonus(int[][] counts) {
         for (int i = 0; i < SIZE; i++) {
-            if (isCellAvailable(ShotCoordinate.of(i, 0))) counts[0][i] += 10;
-            if (isCellAvailable(ShotCoordinate.of(i, SIZE - 1))) counts[SIZE - 1][i] += 10;
-            if (isCellAvailable(ShotCoordinate.of(0, i))) counts[i][0] += 10;
-            if (isCellAvailable(ShotCoordinate.of(SIZE - 1, i))) counts[i][SIZE - 1] += 10;
+            ShotCoordinate top = new ShotCoordinate(i, 0);
+            ShotCoordinate bottom = new ShotCoordinate(i, SIZE - 1);
+            ShotCoordinate left = new ShotCoordinate(0, i);
+            ShotCoordinate right = new ShotCoordinate(SIZE - 1, i);
+
+            if (isCellAvailable(top)) counts[0][i] += 10;
+            if (isCellAvailable(bottom)) counts[SIZE - 1][i] += 10;
+            if (isCellAvailable(left)) counts[i][0] += 10;
+            if (isCellAvailable(right)) counts[i][SIZE - 1] += 10;
         }
     }
 
@@ -232,7 +219,7 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         int maxCount = 0;
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
-                ShotCoordinate cell = ShotCoordinate.of(c, r);
+                ShotCoordinate cell = new ShotCoordinate(c, r);
                 if (isCellAvailable(cell) && counts[r][c] > maxCount) {
                     maxCount = counts[r][c];
                 }
@@ -245,26 +232,13 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         List<ShotCoordinate> candidates = new ArrayList<>();
         for (int r = 0; r < SIZE; r++) {
             for (int c = 0; c < SIZE; c++) {
-                ShotCoordinate cell = ShotCoordinate.of(c, r);
+                ShotCoordinate cell = new ShotCoordinate(c, r);
                 if (isCellAvailable(cell) && counts[r][c] == maxCount) {
                     candidates.add(cell);
                 }
             }
         }
         return candidates;
-    }
-
-    private ShotCoordinate findFirstEmptyCell() {
-        for (int r = 0; r < SIZE; r++) {
-            for (int c = 0; c < SIZE; c++) {
-                ShotCoordinate coordinate = ShotCoordinate.of(c, r);
-                if (isCellAvailable(coordinate)) {
-                    return coordinate;
-                }
-            }
-        }
-        // Fallback к базовому классу
-        return findAnyUntriedCell();
     }
 
     // ===============================================================================
@@ -277,22 +251,22 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
 
         // Горизонтальная цепочка
         int left = c;
-        while (left > 0 && hits.contains(ShotCoordinate.of(left - 1, r))) left--;
+        while (left > 0 && hits.contains(new ShotCoordinate(left - 1, r))) left--;
         int right = c;
-        while (right < SIZE - 1 && hits.contains(ShotCoordinate.of(right + 1, r))) right++;
+        while (right < SIZE - 1 && hits.contains(new ShotCoordinate(right + 1, r))) right++;
         List<ShotCoordinate> horizontalChain = new ArrayList<>();
         for (int col = left; col <= right; col++) {
-            horizontalChain.add(ShotCoordinate.of(col, r));
+            horizontalChain.add(new ShotCoordinate(col, r));
         }
 
         // Вертикальная цепочка
         int up = r;
-        while (up > 0 && hits.contains(ShotCoordinate.of(c, up - 1))) up--;
+        while (up > 0 && hits.contains(new ShotCoordinate(c, up - 1))) up--;
         int down = r;
-        while (down < SIZE - 1 && hits.contains(ShotCoordinate.of(c, down + 1))) down++;
+        while (down < SIZE - 1 && hits.contains(new ShotCoordinate(c, down + 1))) down++;
         List<ShotCoordinate> verticalChain = new ArrayList<>();
         for (int row = up; row <= down; row++) {
-            verticalChain.add(ShotCoordinate.of(c, row));
+            verticalChain.add(new ShotCoordinate(c, row));
         }
 
         return horizontalChain.size() >= verticalChain.size() ? horizontalChain : verticalChain;
@@ -324,7 +298,7 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
     }
 
     // ===============================================================================
-    // Методы для доступа к состоянию (для тестирования)
+    // Методы для доступа к состоянию
     // ===============================================================================
 
     public List<Integer> getRemainingShips() {
@@ -339,14 +313,18 @@ public class DensityAnalysisStrategy extends BaseShootingStrategy {
         return !huntQueue.isEmpty() || !huntHits.isEmpty();
     }
 
+    public int getConsecutiveMisses() {
+        return consecutiveMisses;
+    }
+
     /**
      * Проверяет синхронизацию между board и tried[][]
      */
     public void validateSynchronization() {
         for (int row = 0; row < SIZE; row++) {
             for (int col = 0; col < SIZE; col++) {
-                ShotCoordinate cell = ShotCoordinate.of(col, row);
-                boolean isTried = isCellTried(cell);
+                ShotCoordinate cell = new ShotCoordinate(col, row);
+                boolean isTried = tried[col][row];
                 CellState state = board[row][col];
 
                 // Проверка согласованности

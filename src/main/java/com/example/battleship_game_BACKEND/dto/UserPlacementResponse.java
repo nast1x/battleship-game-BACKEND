@@ -4,8 +4,7 @@ import java.util.Date;
 import java.util.List;
 
 public record UserPlacementResponse(
-        Long id,
-        String name,
-        Date createdDate,
-        List<ShipPlacementDto> ships
+        Long strategyId,
+        String strategyName,
+        List<ShipPlacementDto> shipPlacements
 ) {}

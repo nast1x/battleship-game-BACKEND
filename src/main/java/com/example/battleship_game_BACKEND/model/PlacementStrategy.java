@@ -1,15 +1,13 @@
 package com.example.battleship_game_BACKEND.model;
 
-
 import jakarta.persistence.*;
 import lombok.Data;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
+import java.util.*;
 
 @Entity
 @Table(name = "placement_strategy")
@@ -27,172 +25,279 @@ public class PlacementStrategy {
     @Column(name = "strategy_name", nullable = false, length = 100)
     private String strategyName;
 
-    @Column(name = "placement_data", nullable = false, columnDefinition = "TEXT")
-    private String placementData; // JSON с данными расстановки кораблей
+    @Column(name = "placement_matrix", nullable = false, columnDefinition = "CHAR(10)[]")
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    private String[] placementMatrix;
 
-    // Методы для работы с данными расстановки
+    // Транзиентное поле для работы с данными расстановки
+    @Transient
+    private List<ShipPlacement> placementData;
+
+    // Record для хранения информации о корабле
+    public record ShipPlacement(int shipId, int size, int row, int col, boolean vertical) {
+        public ShipPlacement {
+            if (size <= 0 || row < 0 || row >= 10 || col < 0 || col >= 10) {
+                throw new IllegalArgumentException("Invalid ship placement data");
+            }
+        }
+    }
+
+    // Инициализация при загрузке из БД
+    @PostLoad
+    public void initPlacementData() {
+        try {
+            this.placementData = parsePlacementDataFromMatrix();
+        } catch (Exception e) {
+            this.placementData = new ArrayList<>();
+        }
+    }
+
+    // Сохранение перед записью в БД
+    @PrePersist
+    @PreUpdate
+    public void updatePlacementMatrix() {
+        if (placementData != null && !placementData.isEmpty()) {
+            updateMatrixFromPlacementData();
+        } else if (placementMatrix == null || placementMatrix.length == 0) {
+            // Создаем пустую матрицу по умолчанию
+            placementMatrix = createEmptyMatrix();
+        }
+    }
+
+    // Метод для получения данных расстановки в виде списка
     public List<ShipPlacement> getPlacementDataAsList() {
-        if (placementData == null || placementData.isEmpty()) {
+        if (placementData == null) {
+            placementData = parsePlacementDataFromMatrix();
+        }
+        return new ArrayList<>(placementData);
+    }
+
+    // Метод для установки данных расстановки из списка
+    public void setPlacementDataFromList(List<ShipPlacement> placements) {
+        this.placementData = new ArrayList<>(placements);
+        updateMatrixFromPlacementData();
+    }
+
+    // Конвертация матрицы в список кораблей
+    private List<ShipPlacement> parsePlacementDataFromMatrix() {
+        if (placementMatrix == null || placementMatrix.length == 0) {
             return new ArrayList<>();
         }
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            return mapper.readValue(placementData,
-                    mapper.getTypeFactory().constructCollectionType(List.class, ShipPlacement.class));
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse placement data", e);
+
+        Character[][] matrix = getPlacementMatrixAsArray();
+        List<ShipPlacement> placements = new ArrayList<>();
+        boolean[][] visited = new boolean[10][10];
+
+        // Стандартные корабли для морского боя: 1x4, 2x3, 3x2, 4x1
+        int[] shipSizes = {4, 3, 3, 2, 2, 2, 1, 1, 1, 1};
+        int shipId = 1;
+
+        for (int size : shipSizes) {
+            boolean found = findAndMarkShip(matrix, visited, size, placements, shipId);
+            if (found) {
+                shipId++;
+            }
         }
+
+        return placements;
     }
 
-    public void setPlacementDataFromList(List<ShipPlacement> placements) {
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            this.placementData = mapper.writeValueAsString(placements);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Failed to serialize placement data", e);
-        }
-    }
-
-    // Дополнительный метод для обратной совместимости с матрицей
-    public Character[][] getPlacementMatrixAsArray() {
-        List<ShipPlacement> placements = getPlacementDataAsList();
-        Character[][] matrix = new Character[10][10];
-
-        // Инициализируем пустую матрицу
+    // Поиск и маркировка корабля определенного размера
+    private boolean findAndMarkShip(Character[][] matrix, boolean[][] visited,
+                                    int size, List<ShipPlacement> placements, int shipId) {
+        // Поиск горизонтального корабля
         for (int i = 0; i < 10; i++) {
+            for (int j = 0; j <= 10 - size; j++) {
+                if (isValidHorizontalShip(matrix, visited, i, j, size)) {
+                    markVisited(visited, i, j, size, true);
+                    placements.add(new ShipPlacement(shipId, size, i, j, false));
+                    return true;
+                }
+            }
+        }
+
+        // Поиск вертикального корабля
+        for (int i = 0; i <= 10 - size; i++) {
             for (int j = 0; j < 10; j++) {
+                if (isValidVerticalShip(matrix, visited, i, j, size)) {
+                    markVisited(visited, i, j, size, false);
+                    placements.add(new ShipPlacement(shipId, size, i, j, true));
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // Проверка возможности размещения горизонтального корабля
+    private boolean isValidHorizontalShip(Character[][] matrix, boolean[][] visited,
+                                          int row, int col, int size) {
+        // Проверяем, что все клетки свободны и не посещены
+        for (int k = 0; k < size; k++) {
+            if (matrix[row][col + k] != 'S' || visited[row][col + k]) {
+                return false;
+            }
+        }
+
+        // Проверяем границы (не должно быть кораблей рядом)
+        for (int k = -1; k <= size; k++) {
+            for (int dr = -1; dr <= 1; dr++) {
+                for (int dc = -1; dc <= 1; dc++) {
+                    if (dr == 0 && dc == 0) continue;
+                    int r = row + dr;
+                    int c = col + k + dc;
+                    if (r >= 0 && r < 10 && c >= 0 && c < 10) {
+                        if (matrix[r][c] == 'S' && !(dr == 0 && k >= 0 && k < size)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // Проверка возможности размещения вертикального корабля
+    private boolean isValidVerticalShip(Character[][] matrix, boolean[][] visited,
+                                        int row, int col, int size) {
+        // Проверяем, что все клетки свободны и не посещены
+        for (int k = 0; k < size; k++) {
+            if (matrix[row + k][col] != 'S' || visited[row + k][col]) {
+                return false;
+            }
+        }
+
+        // Проверяем границы
+        for (int k = -1; k <= size; k++) {
+            for (int dr = -1; dr <= 1; dr++) {
+                for (int dc = -1; dc <= 1; dc++) {
+                    if (dr == 0 && dc == 0) continue;
+                    int r = row + k + dr;
+                    int c = col + dc;
+                    if (r >= 0 && r < 10 && c >= 0 && c < 10) {
+                        if (matrix[r][c] == 'S' && !(k >= 0 && k < size && dc == 0)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    // Отметить посещенные клетки
+    private void markVisited(boolean[][] visited, int row, int col, int size, boolean horizontal) {
+        for (int k = 0; k < size; k++) {
+            if (horizontal) {
+                visited[row][col + k] = true;
+            } else {
+                visited[row + k][col] = true;
+            }
+        }
+    }
+
+    // Обновление матрицы на основе данных о кораблях
+    private void updateMatrixFromPlacementData() {
+        Character[][] matrix = createEmptyCharacterMatrix();
+
+        if (placementData != null) {
+            for (ShipPlacement placement : placementData) {
+                int dx = placement.vertical() ? 1 : 0;
+                int dy = placement.vertical() ? 0 : 1;
+
+                for (int k = 0; k < placement.size(); k++) {
+                    int x = placement.row() + dx * k;
+                    int y = placement.col() + dy * k;
+
+                    if (x >= 0 && x < 10 && y >= 0 && y < 10) {
+                        matrix[x][y] = 'S'; // 'S' - корабль
+                    }
+                }
+            }
+        }
+
+        setPlacementMatrixFromArray(matrix);
+    }
+
+    // Получение матрицы как двумерного массива символов
+    public Character[][] getPlacementMatrixAsArray() {
+        if (placementMatrix == null || placementMatrix.length == 0) {
+            return createEmptyCharacterMatrix();
+        }
+
+        Character[][] matrix = new Character[10][10];
+        for (int i = 0; i < 10 && i < placementMatrix.length; i++) {
+            String row = placementMatrix[i];
+            for (int j = 0; j < 10 && j < row.length(); j++) {
+                matrix[i][j] = row.charAt(j);
+            }
+            // Заполняем остальные ячейки пробелами
+            for (int j = row.length(); j < 10; j++) {
                 matrix[i][j] = ' ';
             }
         }
 
-        // Размещаем корабли в матрице
-        for (ShipPlacement placement : placements) {
-            int dx = placement.vertical() ? 0 : 1;
-            int dy = placement.vertical() ? 1 : 0;
-
-            for (int k = 0; k < placement.size(); k++) {
-                int x = placement.col() + dx * k;
-                int y = placement.row() + dy * k;
-                if (x < 10 && y < 10) {
-                    // Используем символ, представляющий корабль
-                    matrix[y][x] = 'S';
-                }
+        // Заполняем недостающие строки
+        for (int i = placementMatrix.length; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                matrix[i][j] = ' ';
             }
         }
 
         return matrix;
     }
 
+    // Установка матрицы из двумерного массива символов
     public void setPlacementMatrixFromArray(Character[][] matrix) {
-        if (matrix == null || matrix.length != 10 || matrix[0].length != 10) {
-            this.placementData = "[]";
+        if (matrix == null) {
+            this.placementMatrix = createEmptyMatrix();
             return;
         }
 
-        List<ShipPlacement> placements = new ArrayList<>();
-        boolean[][] processed = new boolean[10][10];
+        String[] rows = new String[10];
+        for (int i = 0; i < 10; i++) {
+            StringBuilder row = new StringBuilder();
+            for (int j = 0; j < 10; j++) {
+                row.append(matrix[i][j] != null ? matrix[i][j] : ' ');
+            }
+            rows[i] = row.toString();
+        }
+        this.placementMatrix = rows;
 
-        // Карта для отслеживания использованных shipId по размерам
-        Map<Integer, Integer> sizeCount = new HashMap<>();
-        sizeCount.put(4, 0);
-        sizeCount.put(3, 0);
-        sizeCount.put(2, 0);
-        sizeCount.put(1, 0);
+        // Обновляем placementData на основе новой матрицы
+        this.placementData = parsePlacementDataFromMatrix();
+    }
 
-        // Сначала находим большие корабли (размером > 1)
+    // Создание пустой матрицы символов
+    private Character[][] createEmptyCharacterMatrix() {
+        Character[][] matrix = new Character[10][10];
         for (int i = 0; i < 10; i++) {
             for (int j = 0; j < 10; j++) {
-                if (!processed[i][j] && isShipCell(matrix[i][j])) {
-                    ShipInfo shipInfo = detectShip(matrix, processed, i, j);
-                    if (shipInfo != null) {
-                        int shipId = generateShipId(shipInfo.size, sizeCount);
-                        placements.add(new ShipPlacement(shipId, shipInfo.size,
-                                shipInfo.startRow, shipInfo.startCol,
-                                !shipInfo.horizontal));
-                        sizeCount.put(shipInfo.size, sizeCount.get(shipInfo.size) + 1);
-                    }
-                }
+                matrix[i][j] = ' ';
             }
         }
-
-        setPlacementDataFromList(placements);
+        return matrix;
     }
 
-    private boolean isShipCell(Character cell) {
-        return cell != null && cell != ' ';
-    }
-
-    private ShipInfo detectShip(Character[][] matrix, boolean[][] processed, int startRow, int startCol) {
-        // Проверяем горизонтальное направление
-        int horizontalLength = getShipLength(matrix, processed, startRow, startCol, 0, 1);
-        int verticalLength = getShipLength(matrix, processed, startRow, startCol, 1, 0);
-
-        if (horizontalLength > verticalLength) {
-            // Горизонтальный корабль
-            markShipProcessed(processed, startRow, startCol, horizontalLength, true);
-            return new ShipInfo(startRow, startCol, horizontalLength, true);
-        } else if (verticalLength > 1) {
-            // Вертикальный корабль
-            markShipProcessed(processed, startRow, startCol, verticalLength, false);
-            return new ShipInfo(startRow, startCol, verticalLength, false);
-        } else {
-            // Корабль размером 1
-            processed[startRow][startCol] = true;
-            return new ShipInfo(startRow, startCol, 1, true);
+    // Создание пустой матрицы строк
+    private String[] createEmptyMatrix() {
+        String[] matrix = new String[10];
+        for (int i = 0; i < 10; i++) {
+            matrix[i] = "          "; // 10 пробелов
         }
+        return matrix;
     }
 
-    private int getShipLength(Character[][] matrix, boolean[][] processed, int row, int col, int rowStep, int colStep) {
-        int length = 0;
-        int r = row;
-        int c = col;
-
-        while (r >= 0 && r < 10 && c >= 0 && c < 10 &&
-                !processed[r][c] && isShipCell(matrix[r][c])) {
-            length++;
-            r += rowStep;
-            c += colStep;
-        }
-
-        return length;
-    }
-
-    private void markShipProcessed(boolean[][] processed, int row, int col, int length, boolean horizontal) {
-        int rowStep = horizontal ? 0 : 1;
-        int colStep = horizontal ? 1 : 0;
-
-        for (int i = 0; i < length; i++) {
-            int r = row + rowStep * i;
-            int c = col + colStep * i;
-            if (r >= 0 && r < 10 && c >= 0 && c < 10) {
-                processed[r][c] = true;
-            }
-        }
-    }
-
-    private int generateShipId(int size, Map<Integer, Integer> sizeCount) {
-        // Генерируем shipId на основе размера и количества уже найденных кораблей этого размера
-        return switch (size) {
-            case 4 -> 1;
-            case 3 -> sizeCount.get(3) == 0 ? 2 : 3;
-            case 2 -> 4 + sizeCount.get(2); // 4, 5, 6
-            case 1 -> 7 + sizeCount.get(1); // 7, 8, 9, 10
-            default -> 0;
-        };
-    }
-
-    // Вспомогательный класс для информации о корабле
-    private static class ShipInfo {
-        int startRow;
-        int startCol;
-        int size;
-        boolean horizontal;
-
-        ShipInfo(int startRow, int startCol, int size, boolean horizontal) {
-            this.startRow = startRow;
-            this.startCol = startCol;
-            this.size = size;
-            this.horizontal = horizontal;
-        }
+    // Дополнительный метод для быстрого создания стратегии с кораблями
+    public static PlacementStrategy createWithShips(Player player, String strategyName,
+                                                    List<ShipPlacement> ships) {
+        PlacementStrategy strategy = new PlacementStrategy();
+        strategy.setPlayer(player);
+        strategy.setStrategyName(strategyName);
+        strategy.setPlacementDataFromList(ships);
+        return strategy;
     }
 }

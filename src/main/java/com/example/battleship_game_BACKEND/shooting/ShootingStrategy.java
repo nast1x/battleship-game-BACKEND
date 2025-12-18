@@ -1,20 +1,22 @@
 package com.example.battleship_game_BACKEND.shooting;
 
-/**
- * Record для представления координат выстрела (Java 16+)
- */
+import com.example.battleship_game_BACKEND.service.ShotCoordinate;
+
 public interface ShootingStrategy {
 
     /**
-     * Возвращает координаты следующего выстрела в диапазоне 0-9.
-     * Гарантирует, что клетка еще не обстреливалась.
+     * Получить следующий выстрел
      */
     ShotCoordinate getNextShot();
 
     /**
-     * Обновляет состояние стратегии на основе результата выстрела.
-     * @param hit - попали ли в корабль
-     * @param sunk - потопили ли корабль целиком
+     * Записать результат выстрела
      */
-    void setShotResult(boolean hit, boolean sunk);
+    void recordShot(ShotCoordinate shot, boolean hit, boolean sunk);
+
+    /**
+     * Сбросить состояние стратегии
+     */
+    void reset();
+
 }

@@ -1,6 +1,6 @@
 package com.example.battleship_game_BACKEND.placement;
 
-import com.example.battleship_game_BACKEND.model.ShipPlacement;
+import com.example.battleship_game_BACKEND.model.PlacementStrategy;
 import com.example.battleship_game_BACKEND.repository.PlacementStrategyRepository;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.*;
 
-@Component
+
 public class HalfFieldPlacer extends BasePlacementStrategy {
 
     @Getter
@@ -52,9 +52,9 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
     // ===============================================================================
 
     @Override
-    public List<ShipPlacement> generatePlacement() {
+    public List<PlacementStrategy.ShipPlacement> generatePlacement() {
         // Сначала пытаемся разместить в выбранной половине
-        List<ShipPlacement> primaryResult = attemptHalfFieldPlacement();
+        List<PlacementStrategy.ShipPlacement> primaryResult = attemptHalfFieldPlacement();
         if (!primaryResult.isEmpty()) {
             return primaryResult;
         }
@@ -72,10 +72,10 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
     // Логика размещения в половине поля
     // ===============================================================================
 
-    private List<ShipPlacement> attemptHalfFieldPlacement() {
+    private List<PlacementStrategy.ShipPlacement> attemptHalfFieldPlacement() {
         boolean[][] occupied = new boolean[BOARD_SIZE][BOARD_SIZE];
         List<Map.Entry<Integer, Integer>> shipsQueue = new ArrayList<>(getFleet());
-        List<ShipPlacement> result = new ArrayList<>();
+        List<PlacementStrategy.ShipPlacement> result = new ArrayList<>();
 
         Collections.shuffle(shipsQueue, rand);
         List<Map.Entry<Integer, Integer>> cells = generatePrimaryHalfCells();
@@ -84,11 +84,11 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
                 result : Collections.emptyList();
     }
 
-    private List<ShipPlacement> attemptFullFieldPlacement() {
+    private List<PlacementStrategy.ShipPlacement> attemptFullFieldPlacement() {
         // Используем базовую логику, но с нашим порядком клеток
         boolean[][] occupied = new boolean[BOARD_SIZE][BOARD_SIZE];
         List<Map.Entry<Integer, Integer>> shipsQueue = new ArrayList<>(getFleet());
-        List<ShipPlacement> result = new ArrayList<>();
+        List<PlacementStrategy.ShipPlacement> result = new ArrayList<>();
 
         Collections.shuffle(shipsQueue, rand);
         List<Map.Entry<Integer, Integer>> cells = generateAllCellsPrioritized();
@@ -100,7 +100,7 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
     private boolean placeShipsWithConstraints(
             boolean[][] occupied,
             List<Map.Entry<Integer, Integer>> shipsQueue,
-            List<ShipPlacement> result,
+            List<PlacementStrategy.ShipPlacement> result,
             List<Map.Entry<Integer, Integer>> cells,
             boolean enforceHalfField
     ) {
@@ -122,7 +122,7 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
     private boolean tryPlaceAnyShip(
             boolean[][] occupied,
             List<Map.Entry<Integer, Integer>> shipsQueue,
-            List<ShipPlacement> result,
+            List<PlacementStrategy.ShipPlacement> result,
             int row, int col,
             boolean enforceHalfField
     ) {
@@ -143,7 +143,7 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
             boolean[][] occupied,
             Map.Entry<Integer, Integer> ship,
             int row, int col,
-            List<ShipPlacement> result,
+            List<PlacementStrategy.ShipPlacement> result,
             boolean enforceHalfField
     ) {
         int size = ship.getKey();
@@ -159,7 +159,7 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
             }
 
             if (tryPlace(occupied, col, row, size, horizontal)) {
-                result.add(new ShipPlacement(shipId, size, row, col, !horizontal));
+                result.add(new PlacementStrategy.ShipPlacement(shipId, size, row, col, !horizontal));
                 return true;
             }
         }
@@ -259,11 +259,11 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
     /**
      * Возвращает статистику по размещению
      */
-    public PlacementStatistics getPlacementStatistics(List<ShipPlacement> placements) {
+    public PlacementStatistics getPlacementStatistics(List<PlacementStrategy.ShipPlacement> placements) {
         int primaryHalfShips = 0;
         int secondaryHalfShips = 0;
 
-        for (ShipPlacement placement : placements) {
+        for (PlacementStrategy.ShipPlacement placement : placements) {
             if (isInPrimaryHalf(placement)) {
                 primaryHalfShips++;
             } else {
@@ -279,7 +279,7 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
         );
     }
 
-    private boolean isInPrimaryHalf(ShipPlacement placement) {
+    private boolean isInPrimaryHalf(PlacementStrategy.ShipPlacement placement) {
         boolean isHorizontal = !placement.vertical();
         int startCol = placement.col();
         int size = placement.size();
@@ -295,7 +295,7 @@ public class HalfFieldPlacer extends BasePlacementStrategy {
     /**
      * Проверяет, соответствует ли размещение стратегии половины поля
      */
-    public boolean isValidHalfFieldPlacement(List<ShipPlacement> placements) {
+    public boolean isValidHalfFieldPlacement(List<PlacementStrategy.ShipPlacement> placements) {
         if (!isValidPlacement(placements)) {
             return false;
         }

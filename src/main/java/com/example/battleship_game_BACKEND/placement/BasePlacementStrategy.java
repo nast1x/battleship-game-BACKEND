@@ -2,14 +2,13 @@ package com.example.battleship_game_BACKEND.placement;
 
 import com.example.battleship_game_BACKEND.model.PlacementStrategy;
 import com.example.battleship_game_BACKEND.model.Player;
-import com.example.battleship_game_BACKEND.model.ShipPlacement;
 import com.example.battleship_game_BACKEND.repository.PlacementStrategyRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 
-@Component
+//@Component
 public abstract class BasePlacementStrategy {
 
     protected static final int BOARD_SIZE = 10;
@@ -63,7 +62,7 @@ public abstract class BasePlacementStrategy {
     public PlacementStrategy generateAndSavePlacement(Player player, String strategyName) {
         validatePlayerAndStrategyName(player, strategyName);
 
-        List<ShipPlacement> placements = generatePlacement();
+        List<PlacementStrategy.ShipPlacement> placements = generatePlacement();
 
         PlacementStrategy strategy = placementStrategyRepository
                 .findByPlayerAndStrategyName(player, strategyName)
@@ -79,9 +78,9 @@ public abstract class BasePlacementStrategy {
     /**
      * Генерирует расстановку кораблей
      */
-    public List<ShipPlacement> generatePlacement() {
+    public List<PlacementStrategy.ShipPlacement> generatePlacement() {
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-            List<ShipPlacement> result = attemptPlacement();
+            List<PlacementStrategy.ShipPlacement> result = attemptPlacement();
             if (result != null) {
                 return Collections.unmodifiableList(result);
             }
@@ -95,7 +94,7 @@ public abstract class BasePlacementStrategy {
     /**
      * Загружает сохраненную расстановку для игрока
      */
-    public List<ShipPlacement> loadPlacement(Player player, String strategyName) {
+    public List<PlacementStrategy.ShipPlacement> loadPlacement(Player player, String strategyName) {
         validatePlayerAndStrategyName(player, strategyName);
 
         return placementStrategyRepository
@@ -181,12 +180,12 @@ public abstract class BasePlacementStrategy {
     // Приватные методы (ИСПРАВЛЕННАЯ ЛОГИКА)
     // ===============================================================================
 
-    private List<ShipPlacement> attemptPlacement() {
+    private List<PlacementStrategy.ShipPlacement> attemptPlacement() {
         boolean[][] occupied = new boolean[BOARD_SIZE][BOARD_SIZE];
         List<Map.Entry<Integer, Integer>> shipsQueue = new ArrayList<>(getFleet());
         Collections.shuffle(shipsQueue, rand);
 
-        List<ShipPlacement> result = new ArrayList<>();
+        List<PlacementStrategy.ShipPlacement> result = new ArrayList<>();
         List<Map.Entry<Integer, Integer>> cells = scanCells();
 
         // Пытаемся разместить корабли в заданном порядке клеток
@@ -207,7 +206,7 @@ public abstract class BasePlacementStrategy {
     private boolean placeAnyShipInCell(
             boolean[][] occupied,
             List<Map.Entry<Integer, Integer>> shipsQueue,
-            List<ShipPlacement> result,
+            List<PlacementStrategy.ShipPlacement> result,
             Map.Entry<Integer, Integer> cell
     ) {
         int row = cell.getKey();
@@ -230,7 +229,7 @@ public abstract class BasePlacementStrategy {
             boolean[][] occupied,
             Map.Entry<Integer, Integer> ship,
             int row, int col,
-            List<ShipPlacement> result
+            List<PlacementStrategy.ShipPlacement> result
     ) {
         int size = ship.getKey();
         int shipId = ship.getValue();
@@ -242,7 +241,7 @@ public abstract class BasePlacementStrategy {
         for (boolean horizontal : orientations) {
             if (tryPlace(occupied, col, row, size, horizontal)) {
                 // Важно: ShipPlacement использует (row, col, !horizontal) для вертикальной ориентации
-                result.add(new ShipPlacement(shipId, size, row, col, !horizontal));
+                result.add(new PlacementStrategy.ShipPlacement(shipId, size, row, col, !horizontal));
                 return true;
             }
         }
@@ -315,14 +314,14 @@ public abstract class BasePlacementStrategy {
     /**
      * Для тестирования: проверяет валидность расстановки
      */
-    public boolean isValidPlacement(List<ShipPlacement> placements) {
+    public boolean isValidPlacement(List<PlacementStrategy.ShipPlacement> placements) {
         if (placements == null || placements.size() != FLEET.size()) {
             return false;
         }
 
         boolean[][] occupied = new boolean[BOARD_SIZE][BOARD_SIZE];
 
-        for (ShipPlacement placement : placements) {
+        for (PlacementStrategy.ShipPlacement placement : placements) {
             int size = placement.size();
             boolean horizontal = !placement.vertical(); // Конвертируем обратно
 

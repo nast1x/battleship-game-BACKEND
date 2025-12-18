@@ -1,93 +1,143 @@
 package com.example.battleship_game_BACKEND.service;
 
 import com.example.battleship_game_BACKEND.dto.*;
-import com.example.battleship_game_BACKEND.model.ShipPlacement;
-import com.example.battleship_game_BACKEND.placement.BasePlacementStrategy;
+import com.example.battleship_game_BACKEND.model.PlacementStrategy;
+import com.example.battleship_game_BACKEND.model.Player;
+import com.example.battleship_game_BACKEND.placement.*;
 import com.example.battleship_game_BACKEND.repository.PlacementStrategyRepository;
-import lombok.Getter;
+import com.example.battleship_game_BACKEND.repository.PlayerRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class PlacementService {
 
-    private final Map<String, BasePlacementStrategy> strategies;
-    @Getter
-    private final PlacementStrategyRepository repository;
+    private final PlacementStrategyRepository placementStrategyRepository;
+    private final PlayerRepository playerRepository;
 
-    public PlacementService(List<BasePlacementStrategy> strategyList,
-                            PlacementStrategyRepository repository) {
-        this.repository = repository;
-        this.strategies = strategyList.stream()
-                .collect(Collectors.toMap(
-                        strategy -> {
-                            String className = strategy.getClass().getSimpleName();
-                            return className.replace("Strategy", "").toLowerCase();
-                        },
-                        Function.identity()
-                ));
+    public PlacementService(
+            PlacementStrategyRepository placementStrategyRepository,
+            PlayerRepository playerRepository) {
+        this.placementStrategyRepository = placementStrategyRepository;
+        this.playerRepository = playerRepository;
     }
 
+    /**
+     * Генерация расстановки кораблей
+     */
     public PlacementResponse generatePlacement(PlacementRequest request) {
-        try {
-            // Получаем стратегию
-            BasePlacementStrategy strategy = strategies.get(request.strategy());
-            if (strategy == null) {
-                strategy = strategies.get("random"); // fallback
-            }
+        String strategyName = request.strategyName();
+        List<ShipPlacementDto> ships = generateShipsByStrategy(strategyName);
 
-            if (strategy == null) {
-                return new PlacementResponse(false, "Стратегия не найдена", null, null);
-            }
-
-            // Генерируем расстановку
-            List<ShipPlacement> serverPlacements = strategy.generatePlacement();
-            List<ShipPlacementDto> placements = convertToDto(serverPlacements);
-
-            // Сохраняем если нужно
-            if (request.saveToProfile()) {
-                saveUserPlacement(new SavePlacementRequest(
-                        request.userId(),
-                        "Авто-" + request.strategy(),
-                        placements
-                ));
-            }
-
-            return new PlacementResponse(true, "Расстановка успешно сгенерирована", placements, null);
-
-        } catch (Exception e) {
-            return new PlacementResponse(false, "Ошибка генерации: " + e.getMessage(), null, null);
-        }
+        return new PlacementResponse(ships); // Для record
     }
 
-    public void saveUserPlacement(SavePlacementRequest request) {
-        // TODO: Реализовать сохранение пользовательской расстановки
-        // Пока заглушка - можно сохранять в базу или кеш
-        System.out.println("Сохранение расстановки для пользователя: " + request.userId());
-        System.out.println("Название: " + request.placementName());
-        System.out.println("Корабли: " + request.ships().size());
+    /**
+     * Генерация кораблей по стратегии (метод для совместимости со старым кодом)
+     */
+    public PlacementResponse generatePlacement(String strategyName) {
+        List<ShipPlacementDto> ships = generateShipsByStrategy(strategyName);
+        return new PlacementResponse(ships); // Для record
     }
 
-    public List<UserPlacementResponse> getUserPlacements(String userId) {
-        // TODO: Реализовать загрузку пользовательских расстановок
-        // Пока возвращаем пустой список
-        return List.of();
-    }
+    /**
+     * Генерация кораблей по имени стратегии
+     */
+    private List<ShipPlacementDto> generateShipsByStrategy(String strategyName) {
+        BasePlacementStrategy strategy = createPlacementStrategy(strategyName);
+        List<PlacementStrategy.ShipPlacement> placements = strategy.generatePlacement();
 
-    private List<ShipPlacementDto> convertToDto(List<ShipPlacement> serverPlacements) {
-        return serverPlacements.stream()
-                .map(sp -> new ShipPlacementDto(
-                        sp.shipId(),
-                        sp.size(),
-                        sp.row(),
-                        sp.col(),
-                        sp.vertical()
+        return placements.stream()
+                .map(p -> new ShipPlacementDto(
+                        p.shipId(),
+                        p.size(),
+                        p.row(),
+                        p.col(),
+                        p.vertical()
                 ))
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Создание стратегии размещения
+     */
+    private BasePlacementStrategy createPlacementStrategy(String strategyName) {
+        Random random = new Random();
+
+        switch (strategyName.toUpperCase()) {
+            case "COASTS":
+                return new CoastsPlacer(null, random);
+            case "DIAGONAL":
+                return new DiagonalPlacer(null, random);
+            case "HALFFIELD":
+                return new HalfFieldPlacer(null, random);
+            case "RANDOM":
+            default:
+                return new BasePlacementStrategy(null, random) {
+                    @Override
+                    protected List<Map.Entry<Integer, Integer>> scanCells() {
+                        return generateRandomCells();
+                    }
+                };
+        }
+    }
+
+    /**
+     * Сохранение пользовательской расстановки
+     */
+    @Transactional
+    public void saveUserPlacement(SavePlacementRequest request) {
+        // Используем методы record без get
+        Player player = playerRepository.findById(request.playerId())
+                .orElseThrow(() -> new RuntimeException("Player not found"));
+
+        // Проверяем, существует ли уже стратегия с таким именем
+        if (placementStrategyRepository.existsByPlayerAndStrategyName(player, request.strategyName())) {
+            throw new RuntimeException("Strategy with this name already exists");
+        }
+
+        PlacementStrategy strategy = new PlacementStrategy();
+        strategy.setPlayer(player);
+        strategy.setStrategyName(request.strategyName());
+        strategy.setPlacementDataFromList(
+                request.ships().stream()  // Используем ships() вместо getShips()
+                        .map(ShipPlacementDto::toPlacementStrategy)
+                        .collect(Collectors.toList())
+        );
+
+        placementStrategyRepository.save(strategy);
+    }
+
+    /**
+     * Получение расстановок пользователя
+     */
+    public List<UserPlacementResponse> getUserPlacements(Long playerId) {
+        // Проверяем, существует ли игрок
+        if (!playerRepository.existsById(playerId)) {
+            throw new RuntimeException("Player not found");
+        }
+
+        List<PlacementStrategy> strategies = placementStrategyRepository.findByPlayerPlayerId(playerId);
+
+        return strategies.stream()
+                .map(strategy -> new UserPlacementResponse(
+                        strategy.getStrategyId(),
+                        strategy.getStrategyName(),
+                        strategy.getPlacementDataAsList().stream()
+                                .map(placement -> new ShipPlacementDto(
+                                        placement.shipId(),
+                                        placement.size(),
+                                        placement.row(),
+                                        placement.col(),
+                                        placement.vertical()
+                                ))
+                                .toList()
+                ))
+                .toList();
+    }
 }

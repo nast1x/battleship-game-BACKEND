@@ -37,7 +37,6 @@ public class ComputerGameService {
         Random random = new Random();
 
         int[] getNextShot() {
-            // Сначала проверяем, есть ли доступные клетки
             List<int[]> available = new ArrayList<>();
             for (int row = 0; row < BOARD_SIZE; row++) {
                 for (int col = 0; col < BOARD_SIZE; col++) {
@@ -48,16 +47,14 @@ public class ComputerGameService {
             }
 
             if (available.isEmpty()) {
-                return new int[]{0, 0}; // fallback
+                return new int[]{0, 0};
             }
 
-            // Выбираем случайную доступную клетку
             int[] cell = available.get(random.nextInt(available.size()));
             shotGrid[cell[0]][cell[1]] = true;
             return cell;
         }
     }
-
 
     private final Map<Long, ComputerShotState> computerShotStates = new HashMap<>();
 
@@ -69,8 +66,15 @@ public class ComputerGameService {
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new RuntimeException("Player not found: " + playerId));
 
-        Player computer = playerRepository.findById(COMPUTER_PLAYER_ID)
-                .orElseThrow(() -> new RuntimeException("Computer player not found"));
+        // Ищем или создаем игрока-компьютера
+        Player computer = playerRepository.findByNickname("COMPUTER")
+                .orElseGet(() -> {
+                    Player newComputer = new Player();
+                    newComputer.setNickname("COMPUTER");
+                    newComputer.setPassword("computer");
+                    newComputer.setStatus(false);
+                    return playerRepository.save(newComputer);
+                });
 
         // Создаем доску игрока
         GameBoard playerBoard = createEmptyGameBoard();
@@ -130,58 +134,45 @@ public class ComputerGameService {
     }
 
     /**
-     * Сгенерировать корабли компьютера (прямое создание стратегии)
+     * Сгенерировать корабли компьютера
      */
     private List<ShipPlacementDto> generateComputerShips(String strategyName) {
+        // Создаем стратегию размещения
+        BasePlacementStrategy strategy = createPlacementStrategy(strategyName);
+
+        // Генерируем размещение
+        List<PlacementStrategy.ShipPlacement> placements = strategy.generatePlacement();
+
+        // Конвертируем в DTO
+        return placements.stream()
+                .map(p -> new ShipPlacementDto(
+                        p.shipId(),
+                        p.size(),
+                        p.row(),
+                        p.col(),
+                        p.vertical()
+                ))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Создать стратегию размещения по имени
+     */
+    private BasePlacementStrategy createPlacementStrategy(String strategyName) {
         Random random = new Random();
-        BasePlacementStrategy strategy;
 
         switch (strategyName.toUpperCase()) {
             case "COASTS":
-                strategy = new CoastsPlacer(null, random);
-                break;
-            case "DIAGONAL":
-                strategy = new DiagonalPlacer(null, random);
-                break;
-            case "HALF":
-                // Создаем базовую стратегию для HALF (упрощенно)
-                strategy = new BasePlacementStrategy(null, random) {
-                    @Override
-                    protected List<Map.Entry<Integer, Integer>> scanCells() {
-                        // Разделяем поле пополам и выбираем клетки из одной половины
-                        List<Map.Entry<Integer, Integer>> allCells = generateAllCells();
-                        List<Map.Entry<Integer, Integer>> halfCells = new ArrayList<>();
-                        List<Map.Entry<Integer, Integer>> otherCells = new ArrayList<>();
-
-                        for (Map.Entry<Integer, Integer> cell : allCells) {
-                            if (cell.getKey() < BOARD_SIZE / 2) { // Верхняя половина
-                                halfCells.add(cell);
-                            } else {
-                                otherCells.add(cell);
-                            }
-                        }
-
-                        // Сначала клетки из половины, потом остальные
-                        halfCells.addAll(otherCells);
-                        return halfCells;
-                    }
-                };
-                break;
+                return new CoastsPlacer(null, random);
             case "RANDOM":
             default:
-                // Создаем базовую стратегию со случайным порядком клеток
-                strategy = new BasePlacementStrategy(null, random) {
+                return new BasePlacementStrategy(null, random) {
                     @Override
                     protected List<Map.Entry<Integer, Integer>> scanCells() {
                         return generateRandomCells();
                     }
                 };
         }
-
-        List<com.example.battleship_game_BACKEND.model.ShipPlacement> placements = strategy.generatePlacement();
-        return placements.stream()
-                .map(p -> new ShipPlacementDto(p.shipId(), p.size(), p.row(), p.col(), p.vertical()))
-                .collect(Collectors.toList());
     }
 
     /**
@@ -198,7 +189,7 @@ public class ComputerGameService {
         Character[][] playerBoardMatrix = playerBoard.getPlacementMatrixAsArray();
         Character[][] computerBoardMatrix = computerBoard.getPlacementMatrixAsArray();
 
-        // Получаем корабли игрока
+        // Получаем корабли из JSON
         List<ShipPlacementDto> playerShips = getShipsFromBoard(playerBoard);
         List<ShipPlacementDto> computerShips = getShipsFromBoard(computerBoard);
 
@@ -234,7 +225,7 @@ public class ComputerGameService {
         Map<String, Object> state = new HashMap<>();
         state.put("gameId", gameId);
         state.put("status", game.getGameStatus().toString());
-        state.put("playerTurn", isPlayerTurn(game)); // Нужно определить логику
+        state.put("playerTurn", true); // Игрок всегда ходит первым после настройки
 
         // Доски в упрощенном формате
         state.put("playerBoard", convertBoardToSimpleFormat(playerBoardMatrix, true));
@@ -293,11 +284,9 @@ public class ComputerGameService {
                 int row = ship.row() + (ship.vertical() ? i : 0);
                 int col = ship.col() + (ship.vertical() ? 0 : i);
 
-                if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
-                    if (board[row][col] != HIT) {
-                        sunk = false;
-                        break;
-                    }
+                if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE && board[row][col] != HIT) {
+                    sunk = false;
+                    break;
                 }
             }
 
@@ -310,27 +299,10 @@ public class ComputerGameService {
     }
 
     /**
-     * Определить, чей сейчас ход
-     */
-    private boolean isPlayerTurn(Game game) {
-        // Простая логика: если игра активна, то ход игрока
-        // В реальной игре нужно хранить состояние последнего хода
-        return game.getGameStatus() == GameStatus.ACTIVE;
-    }
-
-    /**
      * Обработать выстрел игрока
      */
-
     @Transactional
     public ShotResponse processPlayerShot(Long gameId, ShotRequest request) {
-        if (request.getGameId() != null && !request.getGameId().equals(gameId)) {
-            throw new RuntimeException("Несоответствие gameId в запросе и пути");
-        }
-
-        // Устанавливаем gameId
-        request.setGameId(gameId);
-
         Game game = gameRepository.findById(gameId)
                 .orElseThrow(() -> new RuntimeException("Game not found: " + gameId));
 
@@ -514,13 +486,12 @@ public class ComputerGameService {
         response.setComputerHit(hit);
 
         if (hit && sunkShip != null) {
-                response.setComputerSunk(true);
-                response.setComputerSunkShipId(sunkShip.shipId());
+            response.setComputerSunk(true);
+            response.setComputerSunkShipId(sunkShip.shipId());
 
-                // Помечаем клетки вокруг потопленного корабля
-                markAroundSunkShip(playerBoardMatrix, sunkShip);
-            }
-
+            // Помечаем клетки вокруг потопленного корабля
+            markAroundSunkShip(playerBoardMatrix, sunkShip);
+        }
 
         // Проверяем, выиграл ли компьютер
         if (areAllShipsSunk(playerShips, playerBoardMatrix)) {
@@ -558,14 +529,8 @@ public class ComputerGameService {
 
         board.setPlacementMatrixFromArray(matrix);
 
-        // Сохраняем корабли в JSON
-        try {
-            board.setGameStateJson(objectMapper.writeValueAsString(
-                    Map.of("ships", ships)
-            ));
-        } catch (Exception e) {
-            log.error("Failed to serialize ships", e);
-        }
+        // Сохраняем корабли в transient поле
+        board.setShips(ships);
     }
 
     /**
@@ -618,10 +583,9 @@ public class ComputerGameService {
                 int row = ship.row() + (ship.vertical() ? i : 0);
                 int col = ship.col() + (ship.vertical() ? 0 : i);
                 if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE && board[row][col] != HIT) {
-                        shipSunk = false;
-                        break;
-                    }
-
+                    shipSunk = false;
+                    break;
+                }
             }
             if (!shipSunk) {
                 return false;
@@ -646,9 +610,8 @@ public class ComputerGameService {
             int row = ship.row() + (ship.vertical() ? i : 0);
             int col = ship.col() + (ship.vertical() ? 0 : i);
             if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE && board[row][col] != HIT) {
-                    return false;
-                }
-
+                return false;
+            }
         }
         return true;
     }
@@ -685,32 +648,19 @@ public class ComputerGameService {
     }
 
     private void updateResponseStats(ShotResponse response, Game game) {
-        // TODO: Добавить подсчет статистики при необходимости
+        // Реализация подсчета статистики при необходимости
     }
 
     private List<ShipPlacementDto> getShipsFromBoard(GameBoard board) {
         try {
-            if (board.getGameStateJson() != null && !board.getGameStateJson().isEmpty()) {
-                Map<String, Object> state = objectMapper.readValue(
-                        board.getGameStateJson(),
-                        new com.fasterxml.jackson.core.type.TypeReference<>() {
-                        }
-                );
-
-                if (state.containsKey("ships")) {
-                    return objectMapper.convertValue(
-                            state.get("ships"),
-                            new com.fasterxml.jackson.core.type.TypeReference<>() {
-                            }
-                    );
-                }
-            }
+            // Загружаем корабли из матрицы
+            board.loadShipsFromMatrix();
+            return board.getShips();
         } catch (Exception e) {
             log.error("Failed to get ships from board", e);
         }
         return Collections.emptyList();
     }
-
     /**
      * Сдаться
      */

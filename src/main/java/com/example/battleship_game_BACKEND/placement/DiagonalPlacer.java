@@ -1,6 +1,6 @@
 package com.example.battleship_game_BACKEND.placement;
 
-import com.example.battleship_game_BACKEND.model.ShipPlacement;
+import com.example.battleship_game_BACKEND.model.PlacementStrategy;
 import com.example.battleship_game_BACKEND.repository.PlacementStrategyRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -11,7 +11,7 @@ import java.util.*;
  * Стратегия размещения кораблей, избегающая главной и побочной диагоналей.
  * Корабли размещаются только в клетках, не лежащих на диагоналях.
  */
-@Component
+//@Component
 public class DiagonalPlacer extends BasePlacementStrategy {
 
     // ===============================================================================
@@ -175,13 +175,13 @@ public class DiagonalPlacer extends BasePlacementStrategy {
     /**
      * Проверяет, является ли размещение допустимым для диагональной стратегии
      */
-    public boolean isValidDiagonalPlacement(List<ShipPlacement> placements) {
+    public boolean isValidDiagonalPlacement(List<PlacementStrategy.ShipPlacement> placements) {
         if (!isValidPlacement(placements)) {
             return false;
         }
 
         // Проверяем, что ни один корабль не пересекает диагонали
-        for (ShipPlacement placement : placements) {
+        for (PlacementStrategy.ShipPlacement placement : placements) {
             boolean isHorizontal = !placement.vertical();
             if (wouldPlaceOnDiagonal(
                     placement.col(),
@@ -218,7 +218,7 @@ public class DiagonalPlacer extends BasePlacementStrategy {
     /**
      * Выводит отладочную информацию о размещении
      */
-    public void printPlacementInfo(List<ShipPlacement> placements) {
+    public void printPlacementInfo(List<PlacementStrategy.ShipPlacement> placements) {
         System.out.println("Diagonal Placement Strategy Info:");
         System.out.println("Total diagonal cells: " + (BOARD_SIZE * 2 - 1)); // -1 для учета пересечения
         System.out.println("Total available cells: " + getAvailableCellCount());
