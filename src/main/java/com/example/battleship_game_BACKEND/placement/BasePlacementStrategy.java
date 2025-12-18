@@ -38,7 +38,7 @@ public abstract class BasePlacementStrategy {
     /**
      * Конструктор по умолчанию для Spring
      */
-    @Autowired
+   // @Autowired
     protected BasePlacementStrategy(PlacementStrategyRepository placementStrategyRepository) {
         this.placementStrategyRepository = placementStrategyRepository;
         this.rand = new Random();

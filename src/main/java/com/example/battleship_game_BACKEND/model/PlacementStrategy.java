@@ -64,6 +64,7 @@ public class PlacementStrategy {
         }
     }
 
+
     // Метод для получения данных расстановки в виде списка
     public List<ShipPlacement> getPlacementDataAsList() {
         if (placementData == null) {

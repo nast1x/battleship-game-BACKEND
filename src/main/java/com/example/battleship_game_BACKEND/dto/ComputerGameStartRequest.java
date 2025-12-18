@@ -11,10 +11,3 @@ public class ComputerGameStartRequest {
     private List<ShipPlacementDto> playerShips;
 }
 
-@Data
-class ShotDto {
-    private Integer row;
-    private Integer col;
-    private boolean hit;
-    private LocalDateTime time;
-}

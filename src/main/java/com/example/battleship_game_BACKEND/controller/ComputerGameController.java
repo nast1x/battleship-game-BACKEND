@@ -51,4 +51,13 @@ public class ComputerGameController {
         computerGameService.surrender(gameId);
         return ResponseEntity.ok().build();
     }
+    @PostMapping("/create")
+    public ResponseEntity<Game> createComputerGame(
+            @RequestParam Long playerId,
+            @RequestBody ComputerGameStartRequest request) {
+        Game game = computerGameService.createComputerGame(playerId, request);
+
+        // Убедитесь, что Game имеет поле gameId и геттер getGameId()
+        return ResponseEntity.ok(game);
+    }
 }
