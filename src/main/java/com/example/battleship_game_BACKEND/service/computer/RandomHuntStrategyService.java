@@ -97,8 +97,8 @@ public class RandomHuntStrategyService {
             sb.append("lastHit=").append(lastHitRow).append(",").append(lastHitCol).append(";");
             sb.append("dir=").append(direction != null ? direction : "null").append(";");
             // Используем точку с запятой как разделитель записей
-            sb.append("shots=").append(String.join(";", shotHistory)).append(";");
-            sb.append("missed=").append(String.join(";", missedAroundLastHit));
+            sb.append("shots=").append(String.join("|", shotHistory)).append(";");
+            sb.append("missed=").append(String.join("|", missedAroundLastHit));
             return sb.toString();
         }
 
@@ -198,9 +198,12 @@ public class RandomHuntStrategyService {
         int lastHitCol = state.getLastHitCol();
 
         if (state.getDirection() == null) {
-            List<String> directions = new ArrayList<>(Arrays.asList("UP", "DOWN", "LEFT", "RIGHT"));
+            // Пробуем все 4 направления
+            String[] directions = {"UP", "DOWN", "LEFT", "RIGHT"};
+            List<String> availableDirs = new ArrayList<>(Arrays.asList(directions));
+            Collections.shuffle(availableDirs); // Случайный порядок
 
-            for (String dir : directions) {
+            for (String dir : availableDirs) {
                 int[] target = getTargetInDirection(lastHitRow, lastHitCol, dir, 1);
                 if (isValidTarget(target[0], target[1], state)) {
                     state.setDirection(dir);
@@ -208,16 +211,21 @@ public class RandomHuntStrategyService {
                 }
             }
 
+            // Не нашли валидного направления
             state.resetHuntMode();
             return getRandomShot(state, enemyMatrix);
         } else {
+            // Продолжаем в текущем направлении
             String currentDir = state.getDirection();
-            int distance = 1;
 
+            // Проверяем следующую клетку в текущем направлении
+            int distance = 1;
             while (true) {
                 int[] target = getTargetInDirection(lastHitRow, lastHitCol, currentDir, distance);
 
+                // Если вышли за пределы или уже стреляли
                 if (!isValidTarget(target[0], target[1], state)) {
+                    // Пробуем противоположное направление
                     String oppositeDir = getOppositeDirection(currentDir);
                     int[] oppositeTarget = getTargetInDirection(lastHitRow, lastHitCol, oppositeDir, 1);
 
@@ -225,16 +233,24 @@ public class RandomHuntStrategyService {
                         state.setDirection(oppositeDir);
                         return oppositeTarget;
                     } else {
+                        // Оба направления заблокированы
                         state.resetHuntMode();
                         return getRandomShot(state, enemyMatrix);
                     }
                 }
 
+                // Если в эту клетку еще не стреляли
                 if (!state.hasShotAt(target[0], target[1])) {
                     return target;
                 }
 
                 distance++;
+
+                // Защита от бесконечного цикла
+                if (distance > 10) {
+                    state.resetHuntMode();
+                    return getRandomShot(state, enemyMatrix);
+                }
             }
         }
     }
@@ -269,7 +285,17 @@ public class RandomHuntStrategyService {
      * Проверить валидность цели
      */
     boolean isValidTarget(int row, int col, ComputerState state) {
-        return row >= 0 && row < 10 && col >= 0 && col < 10 && !state.hasShotAt(row, col);
+        // Проверяем границы
+        if (row < 0 || row >= 10 || col < 0 || col >= 10) {
+            return false;
+        }
+
+        // Проверяем, стреляли ли уже
+        if (state.hasShotAt(row, col)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
