@@ -14,6 +14,7 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/ai")
+@CrossOrigin(origins = {"http://localhost:4200", "http://localhost:4201"})
 public class AIGameController {
 
     @Autowired

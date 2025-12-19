@@ -56,6 +56,7 @@ public class SecurityConfig {
                                 .requestMatchers("/api/players/**").permitAll()
                                 .requestMatchers("/ws/**").permitAll()
                                 .requestMatchers("/api/players/all").permitAll()
+                                .requestMatchers("/api/ai/**").permitAll()  // ✅ ДОБАВЬТЕ ЭТУ СТРОКУ
                                 .requestMatchers("/api/players/current").authenticated()
                                 .requestMatchers("/api/auth/change-password").authenticated()
                                 .anyRequest().authenticated()
@@ -64,6 +65,22 @@ public class SecurityConfig {
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+
+        // Используем "*" для всех origins, но отключаем credentials
+        configuration.setAllowedOrigins(Arrays.asList("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowCredentials(false); // Отключаем credentials
+        configuration.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 /*
     // Встроенный CORS
