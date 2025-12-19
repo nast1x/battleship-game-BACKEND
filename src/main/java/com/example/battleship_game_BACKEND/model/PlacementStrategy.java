@@ -21,6 +21,30 @@ public class PlacementStrategy {
 
     @Column(name = "placement_matrix", nullable = false, columnDefinition = "TEXT")
     private String placementMatrix;
+
+    // Методы для преобразования между String и Character[][]
+    public Character[][] getPlacementMatrixAsArray() {
+        if (placementMatrix == null || placementMatrix.isEmpty()) {
+            return new Character[10][10]; // Возвращаем пустую матрицу 10x10 по умолчанию
+        }
+
+        String[] rows = placementMatrix.split(";");
+        Character[][] matrix = new Character[rows.length][];
+
+        for (int i = 0; i < rows.length; i++) {
+            String[] cols = rows[i].split(",");
+            matrix[i] = new Character[cols.length];
+            for (int j = 0; j < cols.length; j++) {
+                if (cols[j].length() > 0) {
+                    matrix[i][j] = cols[j].charAt(0);
+                } else {
+                    matrix[i][j] = ' '; // Пустая клетка по умолчанию
+                }
+            }
+        }
+        return matrix;
+    }
+
     public void setPlacementMatrixFromArray(Character[][] matrix) {
         if (matrix == null) {
             this.placementMatrix = "";
@@ -37,5 +61,4 @@ public class PlacementStrategy {
         }
         this.placementMatrix = sb.toString();
     }
-
 }

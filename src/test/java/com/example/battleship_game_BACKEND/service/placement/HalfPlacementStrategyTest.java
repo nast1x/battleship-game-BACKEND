@@ -22,9 +22,9 @@ class HalfPlacementStrategyTest {
     void createHalfStrategy_shouldCreateValidLeftHalfStrategy() {
         PlacementStrategy strategy = strategyService.createHalfStrategy(mockPlayer);
 
-        assertNotNull(strategy, "Strategy object should not be null");
-        assertEquals(mockPlayer, strategy.getPlayer(), "Player should be associated with strategy");
-        assertEquals("Половинчатая стратегия", strategy.getStrategyName(), "Strategy name should be correct");
+        assertNotNull(strategy, "Strategy should not be null");
+        assertEquals(mockPlayer, strategy.getPlayer(), "Player should be associated correctly");
+        assertEquals("Половинчатая стратегия", strategy.getStrategyName(), "Strategy name should match");
         assertNotNull(strategy.getPlacementMatrix(), "Placement matrix should not be null");
         assertFalse(strategy.getPlacementMatrix().isEmpty(), "Placement matrix should not be empty");
 
@@ -35,9 +35,9 @@ class HalfPlacementStrategyTest {
     void createHalfStrategyRight_shouldCreateValidRightHalfStrategy() {
         PlacementStrategy strategy = strategyService.createHalfStrategyRight(mockPlayer);
 
-        assertNotNull(strategy, "Strategy object should not be null");
-        assertEquals(mockPlayer, strategy.getPlayer(), "Player should be associated with strategy");
-        assertEquals("Половинчатая стратегия (правая)", strategy.getStrategyName(), "Strategy name should be correct");
+        assertNotNull(strategy, "Strategy should not be null");
+        assertEquals(mockPlayer, strategy.getPlayer(), "Player should be associated correctly");
+        assertEquals("Половинчатая стратегия (правая)", strategy.getStrategyName(), "Strategy name should match");
         assertNotNull(strategy.getPlacementMatrix(), "Placement matrix should not be null");
         assertFalse(strategy.getPlacementMatrix().isEmpty(), "Placement matrix should not be empty");
 
@@ -49,10 +49,11 @@ class HalfPlacementStrategyTest {
         PlacementStrategy strategy = strategyService.createHalfStrategy(mockPlayer);
         Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
 
-        assertShipSegment(matrix, 2, 0);
-        assertShipSegment(matrix, 2, 1);
-        assertShipSegment(matrix, 2, 2);
-        assertShipSegment(matrix, 2, 3);
+        // Verify 4-deck ship at row 2, columns 0-3
+        assertShipSegment(matrix, 2, 0, "4-deck ship start");
+        assertShipSegment(matrix, 2, 1, "4-deck ship middle");
+        assertShipSegment(matrix, 2, 2, "4-deck ship middle");
+        assertShipSegment(matrix, 2, 3, "4-deck ship end");
     }
 
     @Test
@@ -60,10 +61,11 @@ class HalfPlacementStrategyTest {
         PlacementStrategy strategy = strategyService.createHalfStrategyRight(mockPlayer);
         Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
 
-        assertShipSegment(matrix, 2, 5);
-        assertShipSegment(matrix, 2, 6);
-        assertShipSegment(matrix, 2, 7);
-        assertShipSegment(matrix, 2, 8);
+        // Verify 4-deck ship at row 2, columns 5-8
+        assertShipSegment(matrix, 2, 5, "4-deck ship start");
+        assertShipSegment(matrix, 2, 6, "4-deck ship middle");
+        assertShipSegment(matrix, 2, 7, "4-deck ship middle");
+        assertShipSegment(matrix, 2, 8, "4-deck ship end");
     }
 
     @Test
@@ -71,15 +73,15 @@ class HalfPlacementStrategyTest {
         PlacementStrategy strategy = strategyService.createHalfStrategy(mockPlayer);
         Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
 
-        // First 3-deck ship (horizontal)
-        assertShipSegment(matrix, 5, 0);
-        assertShipSegment(matrix, 5, 1);
-        assertShipSegment(matrix, 5, 2);
+        // Horizontal 3-deck at row 5, columns 0-2
+        assertShipSegment(matrix, 5, 0, "3-deck horizontal start");
+        assertShipSegment(matrix, 5, 1, "3-deck horizontal middle");
+        assertShipSegment(matrix, 5, 2, "3-deck horizontal end");
 
-        // Second 3-deck ship (vertical)
-        assertShipSegment(matrix, 0, 4);
-        assertShipSegment(matrix, 1, 4);
-        assertShipSegment(matrix, 2, 4);
+        // Vertical 3-deck at column 4, rows 0-2
+        assertShipSegment(matrix, 0, 4, "3-deck vertical top");
+        assertShipSegment(matrix, 1, 4, "3-deck vertical middle");
+        assertShipSegment(matrix, 2, 4, "3-deck vertical bottom");
     }
 
     @Test
@@ -87,15 +89,15 @@ class HalfPlacementStrategyTest {
         PlacementStrategy strategy = strategyService.createHalfStrategyRight(mockPlayer);
         Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
 
-        // First 3-deck ship (horizontal)
-        assertShipSegment(matrix, 5, 5);
-        assertShipSegment(matrix, 5, 6);
-        assertShipSegment(matrix, 5, 7);
+        // Horizontal 3-deck at row 5, columns 5-7
+        assertShipSegment(matrix, 5, 5, "3-deck horizontal start");
+        assertShipSegment(matrix, 5, 6, "3-deck horizontal middle");
+        assertShipSegment(matrix, 5, 7, "3-deck horizontal end");
 
-        // Second 3-deck ship (vertical)
-        assertShipSegment(matrix, 0, 9);
-        assertShipSegment(matrix, 1, 9);
-        assertShipSegment(matrix, 2, 9);
+        // Vertical 3-deck at column 9, rows 0-2
+        assertShipSegment(matrix, 0, 9, "3-deck vertical top");
+        assertShipSegment(matrix, 1, 9, "3-deck vertical middle");
+        assertShipSegment(matrix, 2, 9, "3-deck vertical bottom");
     }
 
     @Test
@@ -103,16 +105,17 @@ class HalfPlacementStrategyTest {
         PlacementStrategy strategy = strategyService.createHalfStrategy(mockPlayer);
         Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
 
-        // Verify all 2-deck ships
-        assertShipSegment(matrix, 7, 0);
-        assertShipSegment(matrix, 7, 1);
+        // Horizontal 2-deck at row 7, columns 0-1
+        assertShipSegment(matrix, 7, 0, "2-deck horizontal start");
+        assertShipSegment(matrix, 7, 1, "2-deck horizontal end");
 
-        assertShipSegment(matrix, 8, 3);
-        assertShipSegment(matrix, 9, 3);
+        // Vertical 2-deck at column 3, rows 8-9
+        assertShipSegment(matrix, 8, 3, "2-deck vertical top");
+        assertShipSegment(matrix, 9, 3, "2-deck vertical bottom");
 
-        // Fixed position (no longer overlaps with 3-deck ship)
-        assertShipSegment(matrix, 4, 2);
-        assertShipSegment(matrix, 4, 3);
+        // Fixed 2-deck at row 4, columns 2-3 (no intersection)
+        assertShipSegment(matrix, 4, 2, "2-deck fixed start");
+        assertShipSegment(matrix, 4, 3, "2-deck fixed end");
     }
 
     @Test
@@ -120,16 +123,17 @@ class HalfPlacementStrategyTest {
         PlacementStrategy strategy = strategyService.createHalfStrategyRight(mockPlayer);
         Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
 
-        // Verify all 2-deck ships
-        assertShipSegment(matrix, 7, 5);
-        assertShipSegment(matrix, 7, 6);
+        // Horizontal 2-deck at row 7, columns 5-6
+        assertShipSegment(matrix, 7, 5, "2-deck horizontal start");
+        assertShipSegment(matrix, 7, 6, "2-deck horizontal end");
 
-        assertShipSegment(matrix, 8, 8);
-        assertShipSegment(matrix, 9, 8);
+        // Vertical 2-deck at column 8, rows 8-9
+        assertShipSegment(matrix, 8, 8, "2-deck vertical top");
+        assertShipSegment(matrix, 9, 8, "2-deck vertical bottom");
 
-        // Fixed position (no longer overlaps with 3-deck ship)
-        assertShipSegment(matrix, 4, 7);
-        assertShipSegment(matrix, 4, 8);
+        // Fixed 2-deck at row 4, columns 7-8 (no intersection)
+        assertShipSegment(matrix, 4, 7, "2-deck fixed start");
+        assertShipSegment(matrix, 4, 8, "2-deck fixed end");
     }
 
     @Test
@@ -137,11 +141,11 @@ class HalfPlacementStrategyTest {
         PlacementStrategy strategy = strategyService.createHalfStrategy(mockPlayer);
         Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
 
-        // Verify all 1-deck ships
-        assertShipSegment(matrix, 0, 0);
-        assertShipSegment(matrix, 9, 0);
-        assertShipSegment(matrix, 3, 1);
-        assertShipSegment(matrix, 6, 4);
+        // All 1-deck ships in left half
+        assertShipSegment(matrix, 0, 0, "1-deck top-left corner");
+        assertShipSegment(matrix, 9, 0, "1-deck bottom-left corner");
+        assertShipSegment(matrix, 3, 1, "1-deck center-left");
+        assertShipSegment(matrix, 6, 4, "1-deck right boundary");
     }
 
     @Test
@@ -149,11 +153,11 @@ class HalfPlacementStrategyTest {
         PlacementStrategy strategy = strategyService.createHalfStrategyRight(mockPlayer);
         Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
 
-        // Verify all 1-deck ships
-        assertShipSegment(matrix, 0, 5);
-        assertShipSegment(matrix, 9, 5);
-        assertShipSegment(matrix, 3, 6);
-        assertShipSegment(matrix, 6, 9);
+        // All 1-deck ships in right half
+        assertShipSegment(matrix, 0, 5, "1-deck top boundary");
+        assertShipSegment(matrix, 9, 5, "1-deck bottom boundary");
+        assertShipSegment(matrix, 3, 6, "1-deck center-right");
+        assertShipSegment(matrix, 6, 9, "1-deck right edge");
     }
 
     @Test
@@ -162,7 +166,7 @@ class HalfPlacementStrategyTest {
         Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
 
         int shipCount = countShipCells(matrix);
-        assertEquals(20, shipCount, "Left half should have exactly 20 ship cells");
+        assertEquals(20, shipCount, "Left half should have exactly 20 ship cells after fix");
     }
 
     @Test
@@ -171,7 +175,7 @@ class HalfPlacementStrategyTest {
         Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
 
         int shipCount = countShipCells(matrix);
-        assertEquals(20, shipCount, "Right half should have exactly 20 ship cells");
+        assertEquals(20, shipCount, "Right half should have exactly 20 ship cells after fix");
     }
 
     @Test
@@ -183,7 +187,7 @@ class HalfPlacementStrategyTest {
             for (int j = 0; j < 10; j++) {
                 if (matrix[i][j] == 'S') {
                     assertTrue(j <= 4,
-                            "Ship found at column " + j + " in left half strategy at position [" + i + "][" + j + "]");
+                            "Ship at [" + i + "][" + j + "] is outside left half (column > 4)");
                 }
             }
         }
@@ -198,8 +202,80 @@ class HalfPlacementStrategyTest {
             for (int j = 0; j < 10; j++) {
                 if (matrix[i][j] == 'S') {
                     assertTrue(j >= 5,
-                            "Ship found at column " + j + " in right half strategy at position [" + i + "][" + j + "]");
+                            "Ship at [" + i + "][" + j + "] is outside right half (column < 5)");
                 }
+            }
+        }
+    }
+
+    @Test
+    void createHalfStrategy_shouldHaveNoShipIntersectionsInLeftHalf() {
+        PlacementStrategy strategy = strategyService.createHalfStrategy(mockPlayer);
+        Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
+
+        // Create a copy of placement instructions to verify no intersections
+        Character[][] expectedPlacement = new Character[10][10];
+        initializeEmptyMatrix(expectedPlacement);
+
+        // Apply placements in order and check for intersections
+        int[][] fourDeck = {{2,0}, {2,1}, {2,2}, {2,3}};
+        int[][] threeDeck1 = {{5,0}, {5,1}, {5,2}};
+        int[][] threeDeck2 = {{0,4}, {1,4}, {2,4}};
+        int[][] twoDeck1 = {{7,0}, {7,1}};
+        int[][] twoDeck2 = {{8,3}, {9,3}};
+        int[][] twoDeck3 = {{4,2}, {4,3}}; // Fixed position
+        int[][] singleDeck = {{0,0}, {9,0}, {3,1}, {6,4}};
+
+        applyShipPlacement(expectedPlacement, fourDeck, "4-deck");
+        applyShipPlacement(expectedPlacement, threeDeck1, "3-deck-1");
+        applyShipPlacement(expectedPlacement, threeDeck2, "3-deck-2");
+        applyShipPlacement(expectedPlacement, twoDeck1, "2-deck-1");
+        applyShipPlacement(expectedPlacement, twoDeck2, "2-deck-2");
+        applyShipPlacement(expectedPlacement, twoDeck3, "2-deck-3");
+        applyShipPlacement(expectedPlacement, singleDeck, "1-deck");
+
+        // Verify actual matrix matches expected placement
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                assertEquals(expectedPlacement[i][j], matrix[i][j],
+                        "Cell [" + i + "][" + j + "] has unexpected value. " +
+                                "Expected: " + expectedPlacement[i][j] + ", Actual: " + matrix[i][j]);
+            }
+        }
+    }
+
+    @Test
+    void createHalfStrategyRight_shouldHaveNoShipIntersectionsInRightHalf() {
+        PlacementStrategy strategy = strategyService.createHalfStrategyRight(mockPlayer);
+        Character[][] matrix = convertStringToMatrix(strategy.getPlacementMatrix());
+
+        // Create expected placement matrix
+        Character[][] expectedPlacement = new Character[10][10];
+        initializeEmptyMatrix(expectedPlacement);
+
+        // Apply placements in order
+        int[][] fourDeck = {{2,5}, {2,6}, {2,7}, {2,8}};
+        int[][] threeDeck1 = {{5,5}, {5,6}, {5,7}};
+        int[][] threeDeck2 = {{0,9}, {1,9}, {2,9}};
+        int[][] twoDeck1 = {{7,5}, {7,6}};
+        int[][] twoDeck2 = {{8,8}, {9,8}};
+        int[][] twoDeck3 = {{4,7}, {4,8}}; // Fixed position
+        int[][] singleDeck = {{0,5}, {9,5}, {3,6}, {6,9}};
+
+        applyShipPlacement(expectedPlacement, fourDeck, "4-deck");
+        applyShipPlacement(expectedPlacement, threeDeck1, "3-deck-1");
+        applyShipPlacement(expectedPlacement, threeDeck2, "3-deck-2");
+        applyShipPlacement(expectedPlacement, twoDeck1, "2-deck-1");
+        applyShipPlacement(expectedPlacement, twoDeck2, "2-deck-2");
+        applyShipPlacement(expectedPlacement, twoDeck3, "2-deck-3");
+        applyShipPlacement(expectedPlacement, singleDeck, "1-deck");
+
+        // Verify actual matrix matches expected placement
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                assertEquals(expectedPlacement[i][j], matrix[i][j],
+                        "Cell [" + i + "][" + j + "] has unexpected value. " +
+                                "Expected: " + expectedPlacement[i][j] + ", Actual: " + matrix[i][j]);
             }
         }
     }
@@ -209,16 +285,20 @@ class HalfPlacementStrategyTest {
         PlacementStrategy strategy = strategyService.createHalfStrategy(mockPlayer);
         String placementMatrix = strategy.getPlacementMatrix();
 
+        // Verify format structure
+        assertNotNull(placementMatrix, "Matrix string should not be null");
         String[] rows = placementMatrix.split(";");
-        assertEquals(10, rows.length, "Matrix should contain exactly 10 rows");
+        assertEquals(10, rows.length, "Matrix should have exactly 10 rows");
 
         for (int i = 0; i < rows.length; i++) {
             String row = rows[i];
+            assertNotNull(row, "Row " + i + " should not be null");
             String[] cells = row.split(",");
-            assertEquals(10, cells.length, "Row " + i + " should contain exactly 10 cells");
+            assertEquals(10, cells.length, "Row " + i + " should have exactly 10 cells");
 
             for (int j = 0; j < cells.length; j++) {
                 String cell = cells[j];
+                assertNotNull(cell, "Cell [" + i + "][" + j + "] should not be null");
                 assertEquals(1, cell.length(), "Cell [" + i + "][" + j + "] should be single character");
                 char content = cell.charAt(0);
                 assertTrue(content == ' ' || content == 'S',
@@ -227,6 +307,7 @@ class HalfPlacementStrategyTest {
         }
     }
 
+    // Helper methods
     private Character[][] convertStringToMatrix(String matrixString) {
         Character[][] matrix = new Character[10][10];
         String[] rows = matrixString.split(";");
@@ -262,10 +343,29 @@ class HalfPlacementStrategyTest {
         return count;
     }
 
-    private void assertShipSegment(Character[][] matrix, int row, int col) {
+    private void assertShipSegment(Character[][] matrix, int row, int col, String description) {
         assertTrue(row >= 0 && row < 10 && col >= 0 && col < 10,
-                "Invalid coordinates [" + row + "][" + col + "]");
+                "Invalid coordinates [" + row + "][" + col + "] for " + description);
         assertEquals('S', matrix[row][col],
-                "Expected ship segment 'S' at position [" + row + "][" + col + "]");
+                "Expected ship segment at [" + row + "][" + col + "] for " + description);
+    }
+
+    private void initializeEmptyMatrix(Character[][] matrix) {
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                matrix[i][j] = ' ';
+            }
+        }
+    }
+
+    private void applyShipPlacement(Character[][] matrix, int[][] coordinates, String shipName) {
+        for (int[] coord : coordinates) {
+            int row = coord[0];
+            int col = coord[1];
+            if (matrix[row][col] == 'S') {
+                fail("Intersection detected at [" + row + "][" + col + "] for " + shipName);
+            }
+            matrix[row][col] = 'S';
+        }
     }
 }
