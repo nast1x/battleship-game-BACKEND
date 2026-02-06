@@ -11,6 +11,14 @@
 - **WebSocket** для взаимодействия в реальном времени
 - **MapStruct** для маппинга DTO
 
+## Команда проекта
+Проект разработан командой из трёх человек в рамках лабораторного практикума:
+* **[@nast1x](https://github.com/nast1x)** — бэкенд-разработчик, работа с базой данных   
+* **[@Jane11Al](https://github.com/Jane11Al)** — бэкенд-разработчик
+* **[@shevlya](https://github.com/shevlya)** — дизайнер, фронтенд-разработчик, технический писатель
+
+**Фронтенд-репозиторий:** [battleship-game-FRONTEND](https://github.com/shevlya/battleship-game-FRONTEND)
+
 ## Для запуска
 1. Убедитесь, что установлена Java 21 (*)
 2. Настройте базу данных в `application.properties`
@@ -29,14 +37,3 @@ java {
 }
 ```
 Убедитесь, что версия Spring Boot совместима с выбранной версией Java.
-
-## Команда проекта
-Проект разработан командой из трёх человек в рамках лабораторного практикума:
-* **[@nast1x](https://github.com/nast1x)** — бэкенд-разработчик, работа с базой данных   
-* **[@Jane11Al](https://github.com/Jane11Al)** — бэкенд-разработчик
-* **[@shevlya](https://github.com/shevlya)** — дизайнер, фронтенд-разработчик, технический писатель
-
-**Фронтенд-репозиторий:** [battleship-game-FRONTEND](https://github.com/shevlya/battleship-game-FRONTEND)
-
-
-
