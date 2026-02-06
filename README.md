@@ -17,7 +17,8 @@
 ## Версия Java (*)
 Если у вас установлена другая версия Java, то установите Java 21 или измените версию в настройках проекта.     
 Для этого откройте файл build.gradle и измените версию Java в блоке toolchain:
-    ```gradle
+    ```java
+    gradle
     java {
         toolchain {
             languageVersion = JavaLanguageVersion.of(21) // ← Измените 21 на вашу версию
@@ -32,3 +33,4 @@
 * **[@shevlya](https://github.com/shevlya)** — дизайнер, фронтенд-разработчик, технический писатель
 
 **Фронтенд-репозиторий:** [battleship-game-FRONTEND](https://github.com/shevlya/battleship-game-FRONTEND)
+
