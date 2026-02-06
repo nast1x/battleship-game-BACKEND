@@ -1,188 +1,34 @@
-﻿
-В проекте используется версия Java 21, если у Вас другая, измените её в файле `build.gradle`
+# Battleship Game Backend
+Серверная часть многопользовательской игры "Морской бой". Обеспечивает игровую логику, управление пользователями и проведение матчей между игроками или против ИИ.
 
-# Изменения 21.11 
-- Добавила shooting package для ходов бота
-- добавлен package placement для логики стратегий расстановки
-- в модели ShipPlacement
-- в интерфейсы и модели вспомогательные штуки для новых классов
+## Технологии
+- **Java 21**
+- **Spring Boot 3.5.7**
+- **Spring Security** с JWT-аутентификацией
+- **PostgreSQL**
+- **WebSocket** для взаимодействия в реальном времени
+- **MapStruct** для маппинга DTO
 
-# Изменения 15.11 SecurityConfig и PlayerController
+## Для запуска
+1. Убедитесь, что установлена Java 21 (*)
+2. Настройте базу данных в `application.properties`
+3. Запустите приложение
 
-## SecurityConfig
-добавленена одна строчка    
-.requestMatchers("/api/players/all").permitAll() // нужно для /api/players/all
-
-## PlayerController
-добавлен один метод, чтобы выводить всех игроков    
-// нужен для получения всех игроков   
-
-    @GetMapping("/all")
-    public ResponseEntity<List<Player>> getAllPlayers() {
-    try {
-        System.out.println("Fetching all players");
-        List<Player> players = playerService.getAllPlayers();
-        System.out.println("Returning " + players.size() + " players");
-        return ResponseEntity.ok(players);
-        } catch (Exception e) {
-            System.out.println("Error fetching players: " + e.getMessage());
-            return ResponseEntity.status(500).body(Collections.emptyList());
+## Версия Java (*)
+Если у вас установлена другая версия Java, то установите Java 21 или измените версию в настройках проекта.     
+Для этого откройте файл build.gradle и измените версию Java в блоке toolchain:
+    ```gradle
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(21) // ← Измените 21 на вашу версию
         }
     }
+Убедитесь, что версия Spring Boot совместима с выбранной версией Java.
 
-# Изменения 14.11 только в AuthController.java
+## Команда проекта
+Проект разработан командой из трёх человек в рамках лабораторного практикума:
+* **[@nast1x](https://github.com/nast1x)** — бэкенд-разработчик, работа с базой данных   
+* **[@Jane11Al](https://github.com/Jane11Al)** — бэкенд-разработчик
+* **[@shevlya](https://github.com/shevlya)** — дизайнер, фронтенд-разработчик, технический писатель
 
-## Стало
-
-    package com.example.battleship_game_BACKEND.controller;
-    
-    import com.example.battleship_game_BACKEND.dto.ChangePasswordRequest;
-    import com.example.battleship_game_BACKEND.dto.JwtResponse;
-    import com.example.battleship_game_BACKEND.dto.LoginRequest;
-    import com.example.battleship_game_BACKEND.dto.SignupRequest;
-    import com.example.battleship_game_BACKEND.model.Player;
-    import com.example.battleship_game_BACKEND.service.AuthService;
-    
-    import lombok.RequiredArgsConstructor;
-    import org.springframework.http.ResponseEntity;
-    import org.springframework.security.core.annotation.AuthenticationPrincipal;
-    import org.springframework.web.bind.annotation.*;
-    
-    import java.util.HashMap;
-    import java.util.Map;
-    
-    @RestController
-    @RequestMapping("/api/auth")
-    @CrossOrigin(origins = "*")
-    @RequiredArgsConstructor
-    public class AuthController {
-    private final AuthService authService;
-
-    @PostMapping("/signin")
-    public ResponseEntity<JwtResponse> authenticateUser(@RequestBody LoginRequest loginRequest) {
-        System.out.println("Получен запрос на вход: " + loginRequest.getNickname());
-        try {
-            JwtResponse jwtResponse = authService.authenticateUser(loginRequest);
-            System.out.println("Успешный вход для: " + loginRequest.getNickname());
-            return ResponseEntity.ok(jwtResponse);
-        } catch (Exception e) {
-            System.out.println("Ошибка входа: " + e.getMessage());
-            return ResponseEntity.status(401).build();
-        }
-    }
-
-    @PostMapping("/signup")
-    public ResponseEntity<JwtResponse> registerUser(@RequestBody SignupRequest signUpRequest) {
-        System.out.println("Получен запрос на регистрацию: " + signUpRequest.getNickname());
-        try {
-            JwtResponse jwtResponse = authService.registerUser(signUpRequest);
-            System.out.println("Успешная регистрация для: " + signUpRequest.getNickname());
-            return ResponseEntity.ok(jwtResponse);
-        } catch (RuntimeException e) {
-            System.out.println("Ошибка регистрации: " + e.getMessage());
-            return ResponseEntity.badRequest().build();
-        }
-    }
-
-    @GetMapping("/me")
-    public ResponseEntity<Player> getCurrentUser() {
-        return ResponseEntity.ok().build();
-    }
-
-    // ДОБАВЬТЕ ЭТОТ МЕТОД ДЛЯ СМЕНЫ ПАРОЛЯ
-    @PostMapping("/change-password")
-    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest changePasswordRequest,
-                                            @AuthenticationPrincipal Player player) {
-        try {
-            System.out.println("Получен запрос на смену пароля для пользователя: " +
-                    (player != null ? player.getNickname() : "null"));
-            System.out.println("Старый пароль: " + changePasswordRequest.getOldPassword());
-            System.out.println("Новый пароль: " + changePasswordRequest.getNewPassword());
-
-            if (player == null) {
-                System.out.println("Ошибка: пользователь не аутентифицирован");
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("message", "Пользователь не аутентифицирован");
-                return ResponseEntity.status(401).body(errorResponse);
-            }
-
-            authService.changePassword(player, changePasswordRequest.getOldPassword(), changePasswordRequest.getNewPassword());
-
-            System.out.println("Пароль успешно изменен для пользователя: " + player.getNickname());
-
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Пароль успешно изменен");
-            return ResponseEntity.ok(response);
-
-        } catch (RuntimeException e) {
-            System.out.println("Ошибка при смене пароля: " + e.getMessage());
-
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
-
-        } catch (Exception e) {
-            System.out.println("Неожиданная ошибка при смене пароля: " + e.getMessage());
-
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("message", "Ошибка при смене пароля: " + e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
-        }
-    }
-}
-
-## Было
-
-    package com.example.battleship_game_BACKEND.controller;
-    
-    import com.example.battleship_game_BACKEND.dto.JwtResponse;
-    import com.example.battleship_game_BACKEND.dto.LoginRequest;
-    import com.example.battleship_game_BACKEND.dto.SignupRequest;
-    import com.example.battleship_game_BACKEND.model.Player;
-    import com.example.battleship_game_BACKEND.service.AuthService;
-    
-    import lombok.RequiredArgsConstructor;
-    import org.springframework.http.ResponseEntity;
-    import org.springframework.web.bind.annotation.*;
-    
-    import java.util.List;
-    
-    @RestController
-    @RequestMapping("/api/auth")
-    @CrossOrigin(origins = "*") // ← Добавим, чтобы быть уверенным
-    @RequiredArgsConstructor
-    public class AuthController {
-    private final AuthService authService;
-
-    @PostMapping("/signin")
-    public ResponseEntity<JwtResponse> authenticateUser(@RequestBody LoginRequest loginRequest) {
-        System.out.println("Получен запрос на вход: " + loginRequest.getNickname()); // ← Добавьте
-        try {
-            JwtResponse jwtResponse = authService.authenticateUser(loginRequest);
-            System.out.println("Успешный вход для: " + loginRequest.getNickname()); // ← И это
-            return ResponseEntity.ok(jwtResponse);
-        } catch (Exception e) {
-            System.out.println("Ошибка входа: " + e.getMessage()); // ← И это
-            return ResponseEntity.status(401).build();
-        }
-    }
-
-    @PostMapping("/signup")
-    public ResponseEntity<JwtResponse> registerUser(@RequestBody SignupRequest signUpRequest) {
-        System.out.println("Получен запрос на регистрацию: " + signUpRequest.getNickname()); // ← Добавьте
-        try {
-            JwtResponse jwtResponse = authService.registerUser(signUpRequest);
-            System.out.println("Успешная регистрация для: " + signUpRequest.getNickname()); // ← И это
-            return ResponseEntity.ok(jwtResponse);
-        } catch (RuntimeException e) {
-            System.out.println("Ошибка регистрации: " + e.getMessage()); // ← И это
-            return ResponseEntity.badRequest().build();
-        }
-    }
-
-    @GetMapping("/me")
-    public ResponseEntity<Player> getCurrentUser() {
-        return ResponseEntity.ok().build();
-    }
-}
-
+**Фронтенд-репозиторий:** [battleship-game-FRONTEND](https://github.com/shevlya/battleship-game-FRONTEND)
