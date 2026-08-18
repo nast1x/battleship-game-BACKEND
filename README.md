@@ -36,7 +36,7 @@
 - **[@Jane11Al](https://github.com/Jane11Al)** — бэкенд-разработчик
 - **[@shevlya](https://github.com/shevlya)** — дизайнер, фронтенд-разработчик, технический писатель
 
-🔗 **Фронтенд-репозиторий:** [battleship-game-FRONTEND](https://github.com/shevlya/battleship-game-FRONTEND)
+**Фронтенд-репозиторий:** [battleship-game-FRONTEND](https://github.com/shevlya/battleship-game-FRONTEND)
 
 ---
 
@@ -48,7 +48,7 @@
 
 ---
 
-## ⚙️ Установка и настройка
+## Установка и настройка
 
 1. Клонирование репозитория
 ```bash
